@@ -109,8 +109,8 @@ func (decoder *Decoder) PutBack(frame *astiav.Frame) {
 	decoder.buffer.PutBack(frame)
 }
 
-func (decoder *Decoder) GetSrcFilterContextOptions() func(filter types.BaseFilter) error {
-	return filt.VideoSetFilterContextParameters(decoder.decoderContext)
+func (decoder *Decoder) GetSrcFilterContextOptions() func(filter *Filter) error {
+	return VideoSetFilterContextParameters(decoder.decoderContext)
 }
 
 func (decoder *Decoder) close() {
