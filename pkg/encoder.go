@@ -1,4 +1,4 @@
-package pkg
+package transcode
 
 import (
 	"context"
@@ -7,16 +7,18 @@ import (
 
 	"github.com/asticode/go-astiav"
 
-	"harshabose/transcode/v1/internal"
+	"github.com/harshabose/tools/buffer/pkg"
+
+	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
 )
 
 type Encoder struct {
-	buffer          internal.BufferWithGenerator[astiav.Packet]
+	buffer          buffer.BufferWithGenerator[astiav.Packet]
 	filter          *Filter
 	ctx             context.Context
 	codec           *astiav.Codec
 	encoderContext  *astiav.CodecContext
-	h264options     *astiav.Dictionary
+	codecFlags      *astiav.Dictionary
 	encoderSettings encoderCodecSetting
 	sps             []byte
 	pps             []byte
@@ -24,9 +26,9 @@ type Encoder struct {
 
 func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, options ...EncoderOption) (*Encoder, error) {
 	encoder := &Encoder{
-		buffer:          internal.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreatePacketPool()),
+		buffer:          buffer.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreatePacketPool()),
 		filter:          filter,
-		h264options:     astiav.NewDictionary(),
+		codecFlags:      astiav.NewDictionary(),
 		encoderSettings: EncoderCodecNoSetting,
 		ctx:             ctx,
 	}
@@ -48,7 +50,7 @@ func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, 
 
 	encoder.encoderContext.SetFlags(astiav.NewCodecContextFlags(astiav.CodecContextFlagGlobalHeader))
 
-	if err := encoder.encoderContext.Open(encoder.codec, encoder.h264options); err != nil {
+	if err := encoder.encoderContext.Open(encoder.codec, encoder.codecFlags); err != nil {
 		return nil, err
 	}
 
@@ -59,6 +61,14 @@ func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, 
 
 func (encoder *Encoder) Start() {
 	go encoder.loop()
+}
+
+func (encoder *Encoder) GetFPS() int { // TODO: THIS NEEDS TO BE ABSTRACTED
+	return DefaultVideoFPS
+}
+
+func (encoder *Encoder) GetVideoTimeBase() int { // TODO: THIS NEEDS TO BE ABSTRACTED
+	return DefaultVideoClockRate
 }
 
 func (encoder *Encoder) loop() {

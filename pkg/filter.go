@@ -1,4 +1,4 @@
-package pkg
+package transcode
 
 import (
 	"context"
@@ -6,14 +6,15 @@ import (
 	"time"
 
 	"github.com/asticode/go-astiav"
+	"github.com/harshabose/tools/buffer/pkg"
 
-	"harshabose/transcode/v1/internal"
+	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
 )
 
 type Filter struct {
 	content          string
 	decoder          *Decoder
-	buffer           internal.BufferWithGenerator[astiav.Frame]
+	buffer           buffer.BufferWithGenerator[astiav.Frame]
 	graph            *astiav.FilterGraph
 	input            *astiav.FilterInOut
 	output           *astiav.FilterInOut
@@ -33,7 +34,7 @@ func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *Config, o
 	filter = &Filter{
 		graph:            astiav.AllocFilterGraph(),
 		decoder:          decoder,
-		buffer:           internal.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreateFramePool()),
+		buffer:           buffer.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreateFramePool()),
 		input:            astiav.AllocFilterInOut(),
 		output:           astiav.AllocFilterInOut(),
 		srcContextParams: astiav.AllocBuffersrcFilterContextParameters(),

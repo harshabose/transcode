@@ -1,4 +1,6 @@
-package pkg
+package transcode
+
+import "github.com/asticode/go-astiav"
 
 type DemuxerOption = func(*Demuxer) error
 
@@ -21,5 +23,15 @@ func WithRTSPInputOption(demuxer *Demuxer) error {
 		return err
 	}
 
+	return nil
+}
+
+func WithAlsaInputFormatOption(demuxer *Demuxer) error {
+	demuxer.inputFormat = astiav.FindInputFormat("alsa")
+	return nil
+}
+
+func WithAvFoundationInputFormatOption(demuxer *Demuxer) error {
+	demuxer.inputFormat = astiav.FindInputFormat("avfoundation")
 	return nil
 }

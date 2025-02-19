@@ -4,10 +4,21 @@ import (
 	"sync"
 
 	"github.com/asticode/go-astiav"
+	"github.com/harshabose/tools/buffer/pkg"
 )
 
 type framePool struct {
 	pool sync.Pool
+}
+
+func CreateFramePool() buffer.Pool[astiav.Frame] {
+	return &framePool{
+		pool: sync.Pool{
+			New: func() any {
+				return astiav.AllocFrame()
+			},
+		},
+	}
 }
 
 func (pool *framePool) Get() *astiav.Frame {

@@ -4,10 +4,21 @@ import (
 	"sync"
 
 	"github.com/asticode/go-astiav"
+	"github.com/harshabose/tools/buffer/pkg"
 )
 
 type packetPool struct {
 	pool sync.Pool
+}
+
+func CreatePacketPool() buffer.Pool[astiav.Packet] {
+	return &packetPool{
+		pool: sync.Pool{
+			New: func() any {
+				return astiav.AllocPacket()
+			},
+		},
+	}
 }
 
 func (pool *packetPool) Get() *astiav.Packet {

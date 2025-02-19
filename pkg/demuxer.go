@@ -1,20 +1,22 @@
-package pkg
+package transcode
 
 import (
 	"context"
 	"time"
 
 	"github.com/asticode/go-astiav"
+	"github.com/harshabose/tools/buffer/pkg"
 
-	"harshabose/transcode/v1/internal"
+	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
 )
 
 type Demuxer struct {
 	formatContext   *astiav.FormatContext
 	inputOptions    *astiav.Dictionary
+	inputFormat     *astiav.InputFormat
 	stream          *astiav.Stream
 	codecParameters *astiav.CodecParameters
-	buffer          internal.BufferWithGenerator[astiav.Packet]
+	buffer          buffer.BufferWithGenerator[astiav.Packet]
 	ctx             context.Context
 }
 
@@ -23,7 +25,7 @@ func CreateDemuxer(ctx context.Context, containerAddress string, options ...Demu
 	demuxer := &Demuxer{
 		formatContext: astiav.AllocFormatContext(),
 		inputOptions:  astiav.NewDictionary(),
-		buffer:        internal.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreatePacketPool()),
+		buffer:        buffer.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreatePacketPool()),
 		ctx:           ctx,
 	}
 
@@ -37,7 +39,7 @@ func CreateDemuxer(ctx context.Context, containerAddress string, options ...Demu
 		}
 	}
 
-	if err := demuxer.formatContext.OpenInput(containerAddress, nil, nil); err != nil {
+	if err := demuxer.formatContext.OpenInput(containerAddress, demuxer.inputFormat, demuxer.inputOptions); err != nil {
 		return nil, ErrorOpenInputContainer
 	}
 

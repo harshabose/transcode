@@ -1,4 +1,4 @@
-package pkg
+package transcode
 
 import (
 	"context"
@@ -7,22 +7,23 @@ import (
 	"time"
 
 	"github.com/asticode/go-astiav"
+	"github.com/harshabose/tools/buffer/pkg"
 
-	"harshabose/transcode/v1/internal"
+	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
 )
 
 type Decoder struct {
 	demuxer        *Demuxer
 	decoderContext *astiav.CodecContext
 	codec          *astiav.Codec
-	buffer         internal.BufferWithGenerator[astiav.Frame]
+	buffer         buffer.BufferWithGenerator[astiav.Frame]
 	ctx            context.Context
 }
 
 func CreateDecoder(ctx context.Context, demuxer *Demuxer, options ...DecoderOption) (*Decoder, error) {
 	decoder := &Decoder{
 		demuxer: demuxer,
-		buffer:  internal.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreateFramePool()),
+		buffer:  buffer.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreateFramePool()),
 		ctx:     ctx,
 	}
 

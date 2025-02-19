@@ -3,11 +3,22 @@ package internal
 import (
 	"sync"
 
+	"github.com/harshabose/tools/buffer/pkg"
 	"github.com/pion/rtp"
 )
 
 type rtpPool struct {
 	pool sync.Pool
+}
+
+func CreateRTPPool() buffer.Pool[rtp.Packet] {
+	return &rtpPool{
+		pool: sync.Pool{
+			New: func() any {
+				return &rtp.Packet{}
+			},
+		},
+	}
 }
 
 func (pool *rtpPool) Get() *rtp.Packet {
