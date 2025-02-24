@@ -120,10 +120,6 @@ func (demuxer *Demuxer) GetPacket() (*astiav.Packet, error) {
 	return demuxer.buffer.Pop(ctx)
 }
 
-func (demuxer *Demuxer) GetDecoderContextOptions() func(*Decoder) error {
-	return VideoSetDecoderContext(demuxer.codecParameters, demuxer.stream, demuxer.formatContext)
-}
-
 func (demuxer *Demuxer) PutBack(packet *astiav.Packet) {
 	demuxer.buffer.PutBack(packet)
 }

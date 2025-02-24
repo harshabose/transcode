@@ -20,3 +20,7 @@ const (
 	DefaultAudioSampleFormat = astiav.SampleFormatS16
 	DefaultAudioEncoderCodec = astiav.CodecIDOpus
 )
+
+var (
+	DefaultAudioChannelLayout = astiav.ChannelLayoutStereo
+)

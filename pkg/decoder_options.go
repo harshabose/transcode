@@ -4,7 +4,7 @@ import "github.com/asticode/go-astiav"
 
 type DecoderOption = func(*Decoder) error
 
-func VideoSetDecoderContext(codecParameters *astiav.CodecParameters, videoStream *astiav.Stream, formatContext *astiav.FormatContext) func(*Decoder) error {
+func withVideoSetDecoderContext(codecParameters *astiav.CodecParameters, videoStream *astiav.Stream, formatContext *astiav.FormatContext) func(*Decoder) error {
 	return func(decoder *Decoder) error {
 		var (
 			err error
@@ -28,7 +28,7 @@ func VideoSetDecoderContext(codecParameters *astiav.CodecParameters, videoStream
 	}
 }
 
-func AudioSetDecoderContext(codecParameters *astiav.CodecParameters, stream *astiav.Stream, formatContext *astiav.FormatContext) func(*Decoder) error {
+func withAudioSetDecoderContext(codecParameters *astiav.CodecParameters, stream *astiav.Stream) func(*Decoder) error {
 	return func(decoder *Decoder) error {
 		var (
 			err error

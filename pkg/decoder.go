@@ -29,6 +29,8 @@ func CreateDecoder(ctx context.Context, demuxer *Demuxer, options ...DecoderOpti
 
 	var err error
 
+	options = append([]DecoderOption{withVideoSetDecoderContext(demuxer.codecParameters, demuxer.stream, demuxer.formatContext)}, options...)
+
 	for _, option := range options {
 		if err = option(decoder); err != nil {
 			return nil, err
@@ -108,10 +110,6 @@ func (decoder *Decoder) WaitForFrame() chan *astiav.Frame {
 
 func (decoder *Decoder) PutBack(frame *astiav.Frame) {
 	decoder.buffer.PutBack(frame)
-}
-
-func (decoder *Decoder) GetSrcFilterContextOptions() func(filter *Filter) error {
-	return VideoSetFilterContextParameters(decoder.decoderContext)
 }
 
 func (decoder *Decoder) close() {

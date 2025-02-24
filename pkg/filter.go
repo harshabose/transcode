@@ -24,7 +24,7 @@ type Filter struct {
 	ctx              context.Context
 }
 
-func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *Config, options ...FilterOption) (*Filter, error) {
+func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *FilterConfig, options ...FilterOption) (*Filter, error) {
 	var (
 		filter     *Filter
 		filterSrc  *astiav.Filter
@@ -57,6 +57,8 @@ func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *Config, o
 	if filter.sinkContext, err = filter.graph.NewBuffersinkFilterContext(filterSink, "out"); err != nil {
 		return nil, ErrorAllocSinkContext
 	}
+
+	options = append([]FilterOption{withVideoSetFilterContextParameters(decoder.decoderContext)}, options...)
 
 	for _, option := range options {
 		if err = option(filter); err != nil {

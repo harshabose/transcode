@@ -15,7 +15,7 @@ func (f Name) String() string {
 	return string(f)
 }
 
-type Config struct {
+type FilterConfig struct {
 	Source Name
 	Sink   Name
 }
@@ -28,17 +28,17 @@ const (
 )
 
 var (
-	VideoFilters = &Config{
+	VideoFilters = &FilterConfig{
 		Source: videoBufferFilterName,
 		Sink:   videoBufferSinkFilterName,
 	}
-	AudioFilters = &Config{
+	AudioFilters = &FilterConfig{
 		Source: audioBufferFilterName,
 		Sink:   audioBufferSinkFilterName,
 	}
 )
 
-func VideoSetFilterContextParameters(codecContext *astiav.CodecContext) func(*Filter) error {
+func withVideoSetFilterContextParameters(codecContext *astiav.CodecContext) func(*Filter) error {
 	return func(filter *Filter) error {
 		filter.srcContextParams.SetHeight(codecContext.Height())
 		filter.srcContextParams.SetPixelFormat(codecContext.PixelFormat())
@@ -80,7 +80,7 @@ func videoFPSFilterContent(filter *Filter) error {
 
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-func AudioSetFilterContextParameters(codecContext *astiav.CodecContext) func(*Filter) error {
+func withAudioSetFilterContextParameters(codecContext *astiav.CodecContext) func(*Filter) error {
 	return func(filter *Filter) error {
 		filter.srcContextParams.SetChannelLayout(codecContext.ChannelLayout())
 		filter.srcContextParams.SetSampleFormat(codecContext.SampleFormat())

@@ -20,6 +20,7 @@ type Encoder struct {
 	encoderContext  *astiav.CodecContext
 	codecFlags      *astiav.Dictionary
 	encoderSettings encoderCodecSetting
+	bandwidthChan   chan int64
 	sps             []byte
 	pps             []byte
 }
@@ -84,6 +85,8 @@ loop1:
 		select {
 		case <-encoder.ctx.Done():
 			return
+		case bitrate := <-encoder.bandwidthChan:
+			encoder.encoderContext.SetBitRate(bitrate)
 		case frame = <-encoder.filter.WaitForFrame():
 			if err = encoder.encoderContext.SendFrame(frame); err != nil {
 				encoder.filter.PutBack(frame)
@@ -129,6 +132,10 @@ func (encoder *Encoder) GetPacket() (*astiav.Packet, error) {
 
 func (encoder *Encoder) PutBack(packet *astiav.Packet) {
 	encoder.buffer.PutBack(packet)
+}
+
+func (encoder *Encoder) SetBitrateChannel(channel chan int64) {
+	encoder.bandwidthChan = channel
 }
 
 func (encoder *Encoder) findParameterSets(extraData []byte) {
