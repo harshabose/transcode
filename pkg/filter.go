@@ -26,15 +26,15 @@ type Filter struct {
 
 func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *FilterConfig, options ...FilterOption) (*Filter, error) {
 	var (
-		filter     *Filter
-		filterSrc  *astiav.Filter
-		filterSink *astiav.Filter
-		err        error
+		filter        *Filter
+		filterSrc     *astiav.Filter
+		filterSink    *astiav.Filter
+		contextOption FilterOption
+		err           error
 	)
 	filter = &Filter{
 		graph:            astiav.AllocFilterGraph(),
 		decoder:          decoder,
-		buffer:           buffer.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreateFramePool()),
 		input:            astiav.AllocFilterInOut(),
 		output:           astiav.AllocFilterInOut(),
 		srcContextParams: astiav.AllocBuffersrcFilterContextParameters(),
@@ -58,13 +58,22 @@ func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *FilterCon
 		return nil, ErrorAllocSinkContext
 	}
 
-	options = append([]FilterOption{withVideoSetFilterContextParameters(decoder.decoderContext)}, options...)
+	contextOption = withVideoSetFilterContextParameters(decoder)
+	if decoder.decoderContext.MediaType() == astiav.MediaTypeAudio {
+		contextOption = withAudioSetFilterContextParameters(decoder)
+	}
+
+	options = append([]FilterOption{contextOption}, options...)
 
 	for _, option := range options {
 		if err = option(filter); err != nil {
 			// TODO: SET CONTENT HERE
 			return nil, err
 		}
+	}
+
+	if filter.buffer == nil {
+		filter.buffer = buffer.CreateChannelBuffer(ctx, 256, internal.CreateFramePool())
 	}
 
 	if err = filter.srcContext.SetParameters(filter.srcContextParams); err != nil {

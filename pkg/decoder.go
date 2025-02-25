@@ -21,20 +21,32 @@ type Decoder struct {
 }
 
 func CreateDecoder(ctx context.Context, demuxer *Demuxer, options ...DecoderOption) (*Decoder, error) {
-	decoder := &Decoder{
+	var (
+		err           error
+		contextOption DecoderOption
+		decoder       *Decoder
+	)
+
+	decoder = &Decoder{
 		demuxer: demuxer,
-		buffer:  buffer.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreateFramePool()),
 		ctx:     ctx,
 	}
 
-	var err error
+	contextOption = withVideoSetDecoderContext(demuxer)
+	if decoder.decoderContext.MediaType() == astiav.MediaTypeAudio {
+		contextOption = withAudioSetDecoderContext(demuxer)
+	}
 
-	options = append([]DecoderOption{withVideoSetDecoderContext(demuxer.codecParameters, demuxer.stream, demuxer.formatContext)}, options...)
+	options = append([]DecoderOption{contextOption}, options...)
 
 	for _, option := range options {
 		if err = option(decoder); err != nil {
 			return nil, err
 		}
+	}
+
+	if decoder.buffer == nil {
+		decoder.buffer = buffer.CreateChannelBuffer(ctx, 256, internal.CreateFramePool())
 	}
 
 	if err = decoder.decoderContext.Open(decoder.codec, nil); err != nil {
@@ -91,14 +103,14 @@ loop1:
 }
 
 func (decoder *Decoder) pushFrame(frame *astiav.Frame) error {
-	ctx, cancel := context.WithTimeout(decoder.ctx, time.Second/time.Duration(DefaultVideoFPS))
+	ctx, cancel := context.WithTimeout(decoder.ctx, time.Second)
 	defer cancel()
 
 	return decoder.buffer.Push(ctx, frame)
 }
 
 func (decoder *Decoder) GetFrame() (*astiav.Frame, error) {
-	ctx, cancel := context.WithTimeout(decoder.ctx, time.Second/time.Duration(DefaultVideoFPS))
+	ctx, cancel := context.WithTimeout(decoder.ctx, time.Second)
 	defer cancel()
 
 	return decoder.buffer.Pop(ctx)

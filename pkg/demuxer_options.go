@@ -1,6 +1,11 @@
 package transcode
 
-import "github.com/asticode/go-astiav"
+import (
+	"github.com/asticode/go-astiav"
+	buffer "github.com/harshabose/tools/buffer/pkg"
+
+	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
+)
 
 type DemuxerOption = func(*Demuxer) error
 
@@ -34,4 +39,11 @@ func WithAlsaInputFormatOption(demuxer *Demuxer) error {
 func WithAvFoundationInputFormatOption(demuxer *Demuxer) error {
 	demuxer.inputFormat = astiav.FindInputFormat("avfoundation")
 	return nil
+}
+
+func WithDemuxerBufferSize(size int) DemuxerOption {
+	return func(demuxer *Demuxer) error {
+		demuxer.buffer = buffer.CreateChannelBuffer(demuxer.ctx, size, internal.CreatePacketPool())
+		return nil
+	}
 }

@@ -1,16 +1,21 @@
 package transcode
 
-import "github.com/asticode/go-astiav"
+import (
+	"github.com/asticode/go-astiav"
+	buffer "github.com/harshabose/tools/buffer/pkg"
+
+	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
+)
 
 type DecoderOption = func(*Decoder) error
 
-func withVideoSetDecoderContext(codecParameters *astiav.CodecParameters, videoStream *astiav.Stream, formatContext *astiav.FormatContext) func(*Decoder) error {
+func withVideoSetDecoderContext(demuxer *Demuxer) func(*Decoder) error {
 	return func(decoder *Decoder) error {
 		var (
 			err error
 		)
 
-		if decoder.codec = astiav.FindDecoder(codecParameters.CodecID()); decoder.codec == nil {
+		if decoder.codec = astiav.FindDecoder(demuxer.codecParameters.CodecID()); decoder.codec == nil {
 			return ErrorNoCodecFound
 		}
 
@@ -18,23 +23,23 @@ func withVideoSetDecoderContext(codecParameters *astiav.CodecParameters, videoSt
 			return ErrorAllocateCodecContext
 		}
 
-		if err = videoStream.CodecParameters().ToCodecContext(decoder.decoderContext); err != nil {
+		if err = demuxer.stream.CodecParameters().ToCodecContext(decoder.decoderContext); err != nil {
 			return ErrorFillCodecContext
 		}
 
-		decoder.decoderContext.SetFramerate(formatContext.GuessFrameRate(videoStream, nil))
-		decoder.decoderContext.SetTimeBase(videoStream.TimeBase())
+		decoder.decoderContext.SetFramerate(demuxer.formatContext.GuessFrameRate(demuxer.stream, nil))
+		decoder.decoderContext.SetTimeBase(demuxer.stream.TimeBase())
 		return nil
 	}
 }
 
-func withAudioSetDecoderContext(codecParameters *astiav.CodecParameters, stream *astiav.Stream) func(*Decoder) error {
+func withAudioSetDecoderContext(demuxer *Demuxer) func(*Decoder) error {
 	return func(decoder *Decoder) error {
 		var (
 			err error
 		)
 
-		if decoder.codec = astiav.FindDecoder(codecParameters.CodecID()); decoder.codec == nil {
+		if decoder.codec = astiav.FindDecoder(demuxer.codecParameters.CodecID()); decoder.codec == nil {
 			return ErrorNoCodecFound
 		}
 
@@ -42,11 +47,18 @@ func withAudioSetDecoderContext(codecParameters *astiav.CodecParameters, stream 
 			return ErrorAllocateCodecContext
 		}
 
-		if err = stream.CodecParameters().ToCodecContext(decoder.decoderContext); err != nil {
+		if err = demuxer.stream.CodecParameters().ToCodecContext(decoder.decoderContext); err != nil {
 			return ErrorFillCodecContext
 		}
 
-		decoder.decoderContext.SetTimeBase(stream.TimeBase())
+		decoder.decoderContext.SetTimeBase(demuxer.stream.TimeBase())
+		return nil
+	}
+}
+
+func WithDecoderBufferSize(size int) DecoderOption {
+	return func(decoder *Decoder) error {
+		decoder.buffer = buffer.CreateChannelBuffer(decoder.ctx, size, internal.CreateFramePool())
 		return nil
 	}
 }

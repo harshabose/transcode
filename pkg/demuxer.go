@@ -25,7 +25,6 @@ func CreateDemuxer(ctx context.Context, containerAddress string, options ...Demu
 	demuxer := &Demuxer{
 		formatContext: astiav.AllocFormatContext(),
 		inputOptions:  astiav.NewDictionary(),
-		buffer:        buffer.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreatePacketPool()),
 		ctx:           ctx,
 	}
 
@@ -58,6 +57,10 @@ func CreateDemuxer(ctx context.Context, containerAddress string, options ...Demu
 		return nil, ErrorNoVideoStreamFound
 	}
 	demuxer.codecParameters = demuxer.stream.CodecParameters()
+
+	if demuxer.buffer == nil {
+		demuxer.buffer = buffer.CreateChannelBuffer(ctx, 256, internal.CreatePacketPool())
+	}
 
 	return demuxer, nil
 }
@@ -103,7 +106,7 @@ loop1:
 }
 
 func (demuxer *Demuxer) pushPacket(packet *astiav.Packet) error {
-	ctx, cancel := context.WithTimeout(demuxer.ctx, time.Second/time.Duration(DefaultVideoFPS)) // TODO: NEEDS TO BE BASED ON FPS ON INPUT_FORMAT
+	ctx, cancel := context.WithTimeout(demuxer.ctx, time.Second) // TODO: NEEDS TO BE BASED ON FPS ON INPUT_FORMAT
 	defer cancel()
 
 	return demuxer.buffer.Push(ctx, packet)
@@ -114,7 +117,7 @@ func (demuxer *Demuxer) WaitForPacket() chan *astiav.Packet {
 }
 
 func (demuxer *Demuxer) GetPacket() (*astiav.Packet, error) {
-	ctx, cancel := context.WithTimeout(demuxer.ctx, time.Second/time.Duration(DefaultVideoFPS))
+	ctx, cancel := context.WithTimeout(demuxer.ctx, time.Second)
 	defer cancel()
 
 	return demuxer.buffer.Pop(ctx)

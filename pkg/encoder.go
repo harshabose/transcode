@@ -27,7 +27,6 @@ type Encoder struct {
 
 func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, options ...EncoderOption) (*Encoder, error) {
 	encoder := &Encoder{
-		buffer:     buffer.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreatePacketPool()),
 		filter:     filter,
 		codecFlags: astiav.NewDictionary(),
 		ctx:        ctx,
@@ -37,6 +36,13 @@ func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, 
 	if encoder.encoderContext = astiav.AllocCodecContext(encoder.codec); encoder.encoderContext == nil {
 		return nil, ErrorAllocateCodecContext
 	}
+
+	contextOption := withAudioSetEncoderContextParameters(filter)
+	if filter.sinkContext.MediaType() == astiav.MediaTypeAudio {
+		contextOption = withVideoSetEncoderContextParameters(filter)
+	}
+
+	options = append([]EncoderOption{contextOption}, options...)
 
 	for _, option := range options {
 		if err := option(encoder); err != nil {
@@ -54,7 +60,9 @@ func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, 
 		return nil, err
 	}
 
-	//encoder.findParameterSets(encoder.encoderContext.ExtraData())
+	if encoder.buffer == nil {
+		encoder.buffer = buffer.CreateChannelBuffer(ctx, 256, internal.CreatePacketPool())
+	}
 
 	return encoder, nil
 }
@@ -63,12 +71,15 @@ func (encoder *Encoder) Start() {
 	go encoder.loop()
 }
 
-func (encoder *Encoder) GetFPS() int { // TODO: THIS NEEDS TO BE ABSTRACTED
-	return DefaultVideoFPS
+func (encoder *Encoder) GetDuration() time.Duration {
+	if encoder.encoderContext.MediaType() == astiav.MediaTypeAudio {
+		return time.Second * time.Duration(encoder.encoderContext.FrameSize()) / time.Duration(encoder.encoderContext.SampleRate())
+	}
+	return time.Second / time.Duration(encoder.encoderContext.Framerate().Float64())
 }
 
-func (encoder *Encoder) GetVideoTimeBase() int { // TODO: THIS NEEDS TO BE ABSTRACTED
-	return DefaultVideoClockRate
+func (encoder *Encoder) GetVideoTimeBase() astiav.Rational {
+	return encoder.encoderContext.TimeBase()
 }
 
 func (encoder *Encoder) loop() {
@@ -136,46 +147,6 @@ func (encoder *Encoder) PutBack(packet *astiav.Packet) {
 func (encoder *Encoder) SetBitrateChannel(channel chan int64) {
 	encoder.bandwidthChan = channel
 }
-
-//func (encoder *Encoder) findParameterSets(extraData []byte) {
-//	if len(extraData) > 0 {
-//		// Find first start code (0x00000001)
-//		for i := 0; i < len(extraData)-4; i++ {
-//			if extraData[i] == 0 && extraData[i+1] == 0 && extraData[i+2] == 0 && extraData[i+3] == 1 {
-//				// Skip start code to get NAL type
-//				nalType := extraData[i+4] & 0x1F
-//
-//				// Find next start code or end
-//				nextStart := len(extraData)
-//				for j := i + 4; j < len(extraData)-4; j++ {
-//					if extraData[j] == 0 && extraData[j+1] == 0 && extraData[j+2] == 0 && extraData[j+3] == 1 {
-//						nextStart = j
-//						break
-//					}
-//				}
-//
-//				if nalType == 7 { // SPS
-//					encoder.sps = make([]byte, nextStart-i)
-//					copy(encoder.sps, extraData[i:nextStart])
-//				} else if nalType == 8 { // PPS
-//					encoder.pps = make([]byte, len(extraData)-i)
-//					copy(encoder.pps, extraData[i:])
-//				}
-//
-//				i = nextStart - 1
-//			}
-//		}
-//	}
-//
-//}
-//
-//func (encoder *Encoder) GetSPS() []byte {
-//	return encoder.sps
-//}
-//
-//func (encoder *Encoder) GetPPS() []byte {
-//	return encoder.pps
-//}
 
 func (encoder *Encoder) close() {
 	if encoder.encoderContext != nil {

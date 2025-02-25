@@ -1,6 +1,12 @@
 package transcode
 
-import "reflect"
+import (
+	"reflect"
+
+	buffer "github.com/harshabose/tools/buffer/pkg"
+
+	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
+)
 
 type (
 	EncoderOption = func(*Encoder) error
@@ -202,4 +208,33 @@ func WithX264LowBandwidthOptions(encoder *Encoder) error {
 	return encoder.encoderSettings.ForEach(func(key, value string) error {
 		return encoder.codecFlags.Set(key, value, 0)
 	})
+}
+
+func withVideoSetEncoderContextParameters(filter *Filter) EncoderOption {
+	return func(encoder *Encoder) error {
+		encoder.encoderContext.SetHeight(filter.sinkContext.Height())
+		encoder.encoderContext.SetWidth(filter.sinkContext.Width())
+		encoder.encoderContext.SetTimeBase(filter.sinkContext.TimeBase())
+		encoder.encoderContext.SetPixelFormat(filter.sinkContext.PixelFormat())
+		encoder.encoderContext.SetFramerate(filter.sinkContext.FrameRate())
+		return nil
+	}
+}
+
+func withAudioSetEncoderContextParameters(filter *Filter) EncoderOption {
+	return func(encoder *Encoder) error {
+		encoder.encoderContext.SetTimeBase(filter.sinkContext.TimeBase())
+		encoder.encoderContext.SetSampleRate(filter.sinkContext.SampleRate())
+		encoder.encoderContext.SetSampleFormat(filter.sinkContext.SampleFormat())
+		encoder.encoderContext.SetChannelLayout(filter.sinkContext.ChannelLayout())
+		encoder.encoderContext.SetStrictStdCompliance(-2)
+		return nil
+	}
+}
+
+func WithEncoderBufferSize(size int) EncoderOption {
+	return func(encoder *Encoder) error {
+		encoder.buffer = buffer.CreateChannelBuffer(encoder.ctx, size, internal.CreatePacketPool())
+		return nil
+	}
 }
