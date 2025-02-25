@@ -19,7 +19,7 @@ type Encoder struct {
 	codec           *astiav.Codec
 	encoderContext  *astiav.CodecContext
 	codecFlags      *astiav.Dictionary
-	encoderSettings encoderCodecSetting
+	encoderSettings codecSettings
 	bandwidthChan   chan int64
 	sps             []byte
 	pps             []byte
@@ -27,11 +27,10 @@ type Encoder struct {
 
 func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, options ...EncoderOption) (*Encoder, error) {
 	encoder := &Encoder{
-		buffer:          buffer.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreatePacketPool()),
-		filter:          filter,
-		codecFlags:      astiav.NewDictionary(),
-		encoderSettings: EncoderCodecNoSetting,
-		ctx:             ctx,
+		buffer:     buffer.CreateChannelBuffer(ctx, DefaultVideoFPS*3, internal.CreatePacketPool()),
+		filter:     filter,
+		codecFlags: astiav.NewDictionary(),
+		ctx:        ctx,
 	}
 
 	encoder.codec = astiav.FindEncoder(codecID)
@@ -45,7 +44,7 @@ func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, 
 		}
 	}
 
-	if encoder.encoderSettings == EncoderCodecNoSetting {
+	if encoder.encoderSettings == nil {
 		return nil, ErrorCodecNoSetting
 	}
 
@@ -55,7 +54,7 @@ func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, 
 		return nil, err
 	}
 
-	encoder.findParameterSets(encoder.encoderContext.ExtraData())
+	//encoder.findParameterSets(encoder.encoderContext.ExtraData())
 
 	return encoder, nil
 }
@@ -85,7 +84,7 @@ loop1:
 		select {
 		case <-encoder.ctx.Done():
 			return
-		case bitrate := <-encoder.bandwidthChan:
+		case bitrate := <-encoder.bandwidthChan: // TODO: MIGHT NEED A MUTEX FOR THIS ONE CASE
 			encoder.encoderContext.SetBitRate(bitrate)
 		case frame = <-encoder.filter.WaitForFrame():
 			if err = encoder.encoderContext.SendFrame(frame); err != nil {
@@ -138,45 +137,45 @@ func (encoder *Encoder) SetBitrateChannel(channel chan int64) {
 	encoder.bandwidthChan = channel
 }
 
-func (encoder *Encoder) findParameterSets(extraData []byte) {
-	if len(extraData) > 0 {
-		// Find first start code (0x00000001)
-		for i := 0; i < len(extraData)-4; i++ {
-			if extraData[i] == 0 && extraData[i+1] == 0 && extraData[i+2] == 0 && extraData[i+3] == 1 {
-				// Skip start code to get NAL type
-				nalType := extraData[i+4] & 0x1F
-
-				// Find next start code or end
-				nextStart := len(extraData)
-				for j := i + 4; j < len(extraData)-4; j++ {
-					if extraData[j] == 0 && extraData[j+1] == 0 && extraData[j+2] == 0 && extraData[j+3] == 1 {
-						nextStart = j
-						break
-					}
-				}
-
-				if nalType == 7 { // SPS
-					encoder.sps = make([]byte, nextStart-i)
-					copy(encoder.sps, extraData[i:nextStart])
-				} else if nalType == 8 { // PPS
-					encoder.pps = make([]byte, len(extraData)-i)
-					copy(encoder.pps, extraData[i:])
-				}
-
-				i = nextStart - 1
-			}
-		}
-	}
-
-}
-
-func (encoder *Encoder) GetSPS() []byte {
-	return encoder.sps
-}
-
-func (encoder *Encoder) GetPPS() []byte {
-	return encoder.pps
-}
+//func (encoder *Encoder) findParameterSets(extraData []byte) {
+//	if len(extraData) > 0 {
+//		// Find first start code (0x00000001)
+//		for i := 0; i < len(extraData)-4; i++ {
+//			if extraData[i] == 0 && extraData[i+1] == 0 && extraData[i+2] == 0 && extraData[i+3] == 1 {
+//				// Skip start code to get NAL type
+//				nalType := extraData[i+4] & 0x1F
+//
+//				// Find next start code or end
+//				nextStart := len(extraData)
+//				for j := i + 4; j < len(extraData)-4; j++ {
+//					if extraData[j] == 0 && extraData[j+1] == 0 && extraData[j+2] == 0 && extraData[j+3] == 1 {
+//						nextStart = j
+//						break
+//					}
+//				}
+//
+//				if nalType == 7 { // SPS
+//					encoder.sps = make([]byte, nextStart-i)
+//					copy(encoder.sps, extraData[i:nextStart])
+//				} else if nalType == 8 { // PPS
+//					encoder.pps = make([]byte, len(extraData)-i)
+//					copy(encoder.pps, extraData[i:])
+//				}
+//
+//				i = nextStart - 1
+//			}
+//		}
+//	}
+//
+//}
+//
+//func (encoder *Encoder) GetSPS() []byte {
+//	return encoder.sps
+//}
+//
+//func (encoder *Encoder) GetPPS() []byte {
+//	return encoder.pps
+//}
 
 func (encoder *Encoder) close() {
 	if encoder.encoderContext != nil {
