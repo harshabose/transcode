@@ -3,7 +3,6 @@ package transcode
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/asticode/go-astiav"
@@ -101,7 +100,7 @@ loop1:
 			return
 		case bitrate := <-encoder.bandwidthChan: // TODO: MIGHT NEED A MUTEX FOR THIS ONE CASE
 			encoder.encoderContext.SetBitRate(bitrate)
-			fmt.Printf("bitrate set: %d\n", bitrate)
+			// fmt.Printf("bitrate set: %d\n", bitrate)
 		case frame = <-encoder.filter.WaitForFrame():
 			if err = encoder.encoderContext.SendFrame(frame); err != nil {
 				encoder.filter.PutBack(frame)
