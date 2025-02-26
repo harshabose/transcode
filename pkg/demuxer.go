@@ -47,10 +47,8 @@ func CreateDemuxer(ctx context.Context, containerAddress string, options ...Demu
 	}
 
 	for _, stream := range demuxer.formatContext.Streams() {
-		if stream.CodecParameters().MediaType() == astiav.MediaTypeVideo {
-			demuxer.stream = stream
-			break
-		}
+		demuxer.stream = stream
+		break
 	}
 
 	if demuxer.stream == nil {

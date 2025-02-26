@@ -58,7 +58,9 @@ func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *FilterCon
 		return nil, ErrorAllocSinkContext
 	}
 
-	contextOption = withVideoSetFilterContextParameters(decoder)
+	if decoder.decoderContext.MediaType() == astiav.MediaTypeVideo {
+		contextOption = withVideoSetFilterContextParameters(decoder)
+	}
 	if decoder.decoderContext.MediaType() == astiav.MediaTypeAudio {
 		contextOption = withAudioSetFilterContextParameters(decoder)
 	}

@@ -3,6 +3,7 @@ package transcode
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/asticode/go-astiav"
@@ -37,8 +38,11 @@ func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, 
 		return nil, ErrorAllocateCodecContext
 	}
 
-	contextOption := withAudioSetEncoderContextParameters(filter)
-	if filter.sinkContext.MediaType() == astiav.MediaTypeAudio {
+	var contextOption EncoderOption
+	if filter.sinkContext.MediaType() == astiav.MediaTypeVideo {
+		contextOption = withAudioSetEncoderContextParameters(filter)
+	}
+	if filter.sinkContext.MediaType() == astiav.MediaTypeVideo {
 		contextOption = withVideoSetEncoderContextParameters(filter)
 	}
 
@@ -97,6 +101,7 @@ loop1:
 			return
 		case bitrate := <-encoder.bandwidthChan: // TODO: MIGHT NEED A MUTEX FOR THIS ONE CASE
 			encoder.encoderContext.SetBitRate(bitrate)
+			fmt.Printf("bitrate set: %d\n", bitrate)
 		case frame = <-encoder.filter.WaitForFrame():
 			if err = encoder.encoderContext.SendFrame(frame); err != nil {
 				encoder.filter.PutBack(frame)
