@@ -3,6 +3,7 @@ package transcode
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/asticode/go-astiav"
@@ -66,6 +67,8 @@ func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, 
 	if encoder.buffer == nil {
 		encoder.buffer = buffer.CreateChannelBuffer(ctx, 256, internal.CreatePacketPool())
 	}
+
+	encoder.findParameterSets(encoder.encoderContext.ExtraData())
 
 	return encoder, nil
 }
@@ -155,5 +158,38 @@ func (encoder *Encoder) SetBitrateChannel(channel chan int64) {
 func (encoder *Encoder) close() {
 	if encoder.encoderContext != nil {
 		encoder.encoderContext.Free()
+	}
+}
+
+func (encoder *Encoder) findParameterSets(extraData []byte) {
+	if len(extraData) > 0 {
+		// Find first start code (0x00000001)
+		for i := 0; i < len(extraData)-4; i++ {
+			if extraData[i] == 0 && extraData[i+1] == 0 && extraData[i+2] == 0 && extraData[i+3] == 1 {
+				// Skip start code to get NAL type
+				nalType := extraData[i+4] & 0x1F
+
+				// Find next start code or end
+				nextStart := len(extraData)
+				for j := i + 4; j < len(extraData)-4; j++ {
+					if extraData[j] == 0 && extraData[j+1] == 0 && extraData[j+2] == 0 && extraData[j+3] == 1 {
+						nextStart = j
+						break
+					}
+				}
+
+				if nalType == 7 { // SPS
+					encoder.sps = make([]byte, nextStart-i)
+					copy(encoder.sps, extraData[i:nextStart])
+				} else if nalType == 8 { // PPS
+					encoder.pps = make([]byte, len(extraData)-i)
+					copy(encoder.pps, extraData[i:])
+				}
+
+				i = nextStart - 1
+			}
+		}
+		fmt.Println("SPS for current encoder: ", encoder.sps)
+		fmt.Println("PPS for current encoder: ", encoder.pps)
 	}
 }
