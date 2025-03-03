@@ -77,6 +77,10 @@ func (encoder *Encoder) Start() {
 	go encoder.loop()
 }
 
+func (encoder *Encoder) GetParameterSets() ([]byte, []byte) {
+	return encoder.sps, encoder.pps
+}
+
 func (encoder *Encoder) GetDuration() time.Duration {
 	if encoder.encoderContext.MediaType() == astiav.MediaTypeAudio {
 		return time.Second * time.Duration(encoder.encoderContext.FrameSize()) / time.Duration(encoder.encoderContext.SampleRate())
