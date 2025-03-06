@@ -106,8 +106,8 @@ loop1:
 		case <-encoder.ctx.Done():
 			return
 		case bitrate := <-encoder.bandwidthChan: // TODO: MIGHT NEED A MUTEX FOR THIS ONE CASE
+			fmt.Printf("current bitrate: %d vs. control bitrate: %d\n", encoder.encoderContext.BitRate(), bitrate)
 			encoder.encoderContext.SetBitRate(bitrate)
-			// fmt.Printf("bitrate set: %d\n", bitrate)
 		case frame = <-encoder.filter.WaitForFrame():
 			if err = encoder.encoderContext.SendFrame(frame); err != nil {
 				encoder.filter.PutBack(frame)
