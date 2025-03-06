@@ -176,7 +176,7 @@ var LowBandwidthX264Settings = X264OpenSettings{
 var LowLatencyX264Settings = X264OpenSettings{
 	X264Opts: X264Opts{
 		// RateControl:   "abr",
-		Bitrate:       "5000",
+		Bitrate:       "2500",
 		VBVMaxBitrate: "12000",
 		VBVBuffer:     "20000",
 		RateTol:       "0.5",
