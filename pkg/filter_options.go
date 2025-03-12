@@ -56,6 +56,9 @@ func withVideoSetFilterContextParameters(decoder *Decoder) func(*Filter) error {
 		filter.srcContextParams.SetTimeBase(decoder.decoderContext.TimeBase())
 		filter.srcContextParams.SetWidth(decoder.decoderContext.Width())
 
+		filter.srcContextParams.SetColorSpace(decoder.decoderContext.ColorSpace())
+		filter.srcContextParams.SetColorRange(decoder.decoderContext.ColorRange())
+
 		return nil
 	}
 }
