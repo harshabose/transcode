@@ -2,9 +2,11 @@ package transcode
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/asticode/go-astiav"
+
 	"github.com/harshabose/tools/buffer/pkg"
 
 	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
@@ -39,7 +41,7 @@ func CreateDemuxer(ctx context.Context, containerAddress string, options ...Demu
 	}
 
 	if err := demuxer.formatContext.OpenInput(containerAddress, demuxer.inputFormat, demuxer.inputOptions); err != nil {
-		return nil, ErrorOpenInputContainer
+		return nil, err
 	}
 
 	if err := demuxer.formatContext.FindStreamInfo(nil); err != nil {
@@ -128,6 +130,7 @@ func (demuxer *Demuxer) PutBack(packet *astiav.Packet) {
 func (demuxer *Demuxer) close() {
 	if demuxer.formatContext != nil {
 		demuxer.formatContext.CloseInput()
+		fmt.Println("closed container")
 		demuxer.formatContext.Free()
 	}
 }
