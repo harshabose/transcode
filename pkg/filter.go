@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/asticode/go-astiav"
+
 	"github.com/harshabose/tools/buffer/pkg"
 
 	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
@@ -59,9 +60,11 @@ func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *FilterCon
 	}
 
 	if decoder.decoderContext.MediaType() == astiav.MediaTypeVideo {
+		fmt.Println("video media type detected")
 		contextOption = withVideoSetFilterContextParameters(decoder)
 	}
 	if decoder.decoderContext.MediaType() == astiav.MediaTypeAudio {
+		fmt.Println("audio media type detected")
 		contextOption = withAudioSetFilterContextParameters(decoder)
 	}
 
@@ -82,9 +85,13 @@ func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *FilterCon
 		return nil, ErrorSrcContextSetParameter
 	}
 
-	if err = filter.srcContext.Initialize(nil); err != nil {
+	fmt.Println("check1")
+
+	if err = filter.srcContext.Initialize(astiav.NewDictionary()); err != nil {
 		return nil, ErrorSrcContextInitialise
 	}
+
+	fmt.Println("check2")
 
 	filter.output.SetName("in")
 	filter.output.SetFilterContext(filter.srcContext.FilterContext())

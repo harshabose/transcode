@@ -36,8 +36,8 @@ func CreateDecoder(ctx context.Context, demuxer *Demuxer, options ...DecoderOpti
 	if demuxer.stream.CodecParameters().MediaType() == astiav.MediaTypeVideo {
 		contextOption = withVideoSetDecoderContext(demuxer)
 	}
-	if demuxer.stream.CodecParameters().MediaType() == astiav.MediaTypeVideo {
-		contextOption = withVideoSetDecoderContext(demuxer)
+	if demuxer.stream.CodecParameters().MediaType() == astiav.MediaTypeAudio {
+		contextOption = withAudioSetDecoderContext(demuxer)
 	}
 
 	options = append([]DecoderOption{contextOption}, options...)

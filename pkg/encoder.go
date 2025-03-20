@@ -39,7 +39,7 @@ func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, 
 	}
 
 	var contextOption EncoderOption
-	if filter.sinkContext.MediaType() == astiav.MediaTypeVideo {
+	if filter.sinkContext.MediaType() == astiav.MediaTypeAudio {
 		contextOption = withAudioSetEncoderContextParameters(filter)
 	}
 	if filter.sinkContext.MediaType() == astiav.MediaTypeVideo {
@@ -55,7 +55,7 @@ func CreateEncoder(ctx context.Context, codecID astiav.CodecID, filter *Filter, 
 	}
 
 	if encoder.encoderSettings == nil {
-		return nil, ErrorCodecNoSetting
+		fmt.Println("warn: no encoder settings are provided")
 	}
 
 	encoder.encoderContext.SetFlags(astiav.NewCodecContextFlags(astiav.CodecContextFlagGlobalHeader))
@@ -83,12 +83,12 @@ func (encoder *Encoder) GetParameterSets() ([]byte, []byte) {
 
 func (encoder *Encoder) GetDuration() time.Duration {
 	if encoder.encoderContext.MediaType() == astiav.MediaTypeAudio {
-		return time.Second * time.Duration(encoder.encoderContext.FrameSize()) / time.Duration(encoder.encoderContext.SampleRate())
+		return time.Duration(float64(time.Second) * float64(encoder.encoderContext.FrameSize()) / float64(encoder.encoderContext.SampleRate()))
 	}
-	return time.Second / time.Duration(encoder.encoderContext.Framerate().Float64())
+	return time.Duration(float64(time.Second) / encoder.encoderContext.Framerate().Float64())
 }
 
-func (encoder *Encoder) GetVideoTimeBase() astiav.Rational {
+func (encoder *Encoder) GetTimeBase() astiav.Rational {
 	return encoder.encoderContext.TimeBase()
 }
 
@@ -121,6 +121,8 @@ loop1:
 					encoder.buffer.PutBack(packet)
 					break loop2
 				}
+
+				fmt.Println("got packet", packet.Size())
 
 				if err = encoder.pushPacket(packet); err != nil {
 					encoder.buffer.PutBack(packet)

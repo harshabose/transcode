@@ -4,7 +4,8 @@ import (
 	"fmt"
 
 	"github.com/asticode/go-astiav"
-	buffer "github.com/harshabose/tools/buffer/pkg"
+
+	"github.com/harshabose/tools/buffer/pkg"
 
 	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
 )
@@ -88,6 +89,14 @@ func WithVideoFPSFilterContent(fps uint8) FilterOption {
 
 func withAudioSetFilterContextParameters(decoder *Decoder) func(*Filter) error {
 	return func(filter *Filter) error {
+		// Print parameter values before setting them
+		fmt.Println("Setting filter parameters with values:")
+		fmt.Printf("  Channel Layout: %v\n", decoder.decoderContext.ChannelLayout())
+		fmt.Printf("  Sample Format: %v\n", decoder.decoderContext.SampleFormat())
+		fmt.Printf("  Sample Rate: %v\n", decoder.decoderContext.SampleRate())
+		fmt.Printf("  Time Base: %v\n", decoder.decoderContext.TimeBase())
+
+		// Set the parameters
 		filter.srcContextParams.SetChannelLayout(decoder.decoderContext.ChannelLayout())
 		filter.srcContextParams.SetSampleFormat(decoder.decoderContext.SampleFormat())
 		filter.srcContextParams.SetSampleRate(decoder.decoderContext.SampleRate())
@@ -111,9 +120,9 @@ func WithAudioSampleRateFilter(samplerate uint32) FilterOption {
 	}
 }
 
-func WithAudioFrameSizeContent(framesize uint16) FilterOption {
+func WithAudioSamplesPerFrameContent(nsamples uint16) FilterOption {
 	return func(filter *Filter) error {
-		filter.content += fmt.Sprintf("asetnsamples=%d,", framesize)
+		filter.content += fmt.Sprintf("asetnsamples=%d,", nsamples)
 		return nil
 	}
 }
