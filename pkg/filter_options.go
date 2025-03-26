@@ -2,6 +2,7 @@ package transcode
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/asticode/go-astiav"
 
@@ -146,11 +147,23 @@ func WithAudioHighPassContent(frequency int) FilterOption {
 	}
 }
 
-func WithAudioNotchFilterContent() FilterOption {
+func WithAudioNotchFilterContent(id string, frequency float32, qFactor float32) FilterOption {
 	return func(filter *Filter) error {
-		// NOTE: NOTCH FILTER CAN BE USED TO TARGET SPECIFIC PROPELLER NOISE AND REMOVE THEM
-		// NOTE: THIS MIGHT BE UNIQUE TO DRONE AND POWER LEVELS. I AM NOT SURE HOW TO USE IT TOO.
-		filter.content += "afftfilt=real='re*cos(0)':imag='im*cos(0):win_size=1024:fixed=true',"
+		filter.content += fmt.Sprintf("bandreject@%s=frequency=%.2f:width_type=q:width=%.2f", id, frequency, qFactor)
+		return nil
+	}
+}
+
+func WithAudioNotchHarmonicsFilterContent(id string, fundamental float32, harmonics uint8, qFactor float32) FilterOption {
+	return func(filter *Filter) error {
+		var filters = make([]string, 0)
+
+		for i := uint8(0); i < harmonics; i++ {
+			harmonic := fundamental * float32(i+1)
+			filters = append(filters, fmt.Sprintf("bandreject@%s%d=frequency=%.2f:width_type=q:width=%.2f", id, i, harmonic, qFactor))
+		}
+
+		filter.content += strings.Join(filters, ",") + ","
 		return nil
 	}
 }

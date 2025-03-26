@@ -3,6 +3,7 @@ package transcode
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/asticode/go-astiav"
@@ -17,11 +18,13 @@ type Filter struct {
 	decoder          *Decoder
 	buffer           buffer.BufferWithGenerator[astiav.Frame]
 	graph            *astiav.FilterGraph
+	updators         []Updator
 	input            *astiav.FilterInOut
 	output           *astiav.FilterInOut
 	srcContext       *astiav.BuffersrcFilterContext
 	sinkContext      *astiav.BuffersinkFilterContext
 	srcContextParams *astiav.BuffersrcFilterContextParameters // NOTE: THIS BECOMES NIL AFTER INITIALISATION
+	mux              sync.RWMutex
 	ctx              context.Context
 }
 
@@ -118,11 +121,15 @@ func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *FilterCon
 	if filter.srcContextParams != nil {
 		filter.srcContextParams.Free()
 	}
+
 	return filter, nil
 }
 
 func (filter *Filter) Start() {
 	go filter.loop()
+	for _, updator := range filter.updators {
+		updator.Start(filter)
+	}
 }
 
 func (filter *Filter) loop() {
@@ -139,6 +146,7 @@ loop1:
 		case <-filter.ctx.Done():
 			return
 		case srcFrame = <-filter.decoder.WaitForFrame():
+			filter.mux.Lock()
 			if err = filter.srcContext.AddFrame(srcFrame, astiav.NewBuffersrcFlags(astiav.BuffersrcFlagKeepRef)); err != nil {
 				filter.buffer.PutBack(srcFrame)
 				continue loop1
@@ -157,6 +165,7 @@ loop1:
 				}
 			}
 			filter.decoder.PutBack(srcFrame)
+			filter.mux.Unlock()
 		}
 	}
 }
