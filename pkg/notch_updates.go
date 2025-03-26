@@ -26,6 +26,8 @@ const (
 	PropellerFour  Propeller = "propeller3"
 	PropellerFive  Propeller = "propeller4"
 	PropellerSix   Propeller = "propeller5"
+	PropellerSeven Propeller = "propeller6"
+	PropellerEight Propeller = "propeller7"
 )
 
 type Updator interface {

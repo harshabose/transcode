@@ -138,11 +138,18 @@ func WithAudioCompressionContent(threshold int, ratio int, attack float64, relea
 	}
 }
 
-func WithAudioHighPassContent(frequency int) FilterOption {
+func WithAudioHighPassFilterContent(id string, frequency float32, order uint8) FilterOption {
 	return func(filter *Filter) error {
 		// NOTE: HIGH-PASS FILTER TO REMOVE WIND NOISE AND TURBULENCE
 		// NOTE: 120HZ CUTOFF MIGHT PRESERVE VOICE WHILE REMOVING LOW RUMBLE; BUT MORE TESTING IS NEEDED
-		filter.content += fmt.Sprintf("highpass=f=%d,", frequency)
+		filter.content += fmt.Sprintf("highpass@%s=frequency=%.2f:poles=%d", id, frequency, order)
+		return nil
+	}
+}
+
+func WithAudioLowPassFilterContent(id string, frequency float32, order uint8) FilterOption {
+	return func(filter *Filter) error {
+		filter.content += fmt.Sprintf("lowpass@%s=frequency=%.2f:poles=%d", id, frequency, order)
 		return nil
 	}
 }
@@ -168,20 +175,10 @@ func WithAudioNotchHarmonicsFilterContent(id string, fundamental float32, harmon
 	}
 }
 
-// WARN: DO NOT USE FOR NOW
-func WithAudioNeuralNetworkDenoiserContent(model string) FilterOption {
-	return func(filter *Filter) error {
-		// NOTE: A RECURRENT NEURAL NETWORK MIGHT BE THE BEST SOLUTION HERE BUT I AM NOT SURE HOW TO BUILD IT
-		filter.content += fmt.Sprintf("arnndn=m=%s,", model)
-		return nil
-	}
-}
-
-func WithAudioEqualiserContent(frequency int, width int, gain int) FilterOption {
+func WithAudioEqualiserFilter(id string, frequency float32, width float32, gain float32) FilterOption {
 	return func(filter *Filter) error {
 		// NOTE: EQUALISER CAN BE USED TO ENHANCE SPEECH BANDWIDTH (300 - 3kHz). MORE RESEARCH NEEDS TO DONE
-		filter.content += fmt.Sprintf("equalizer=f=%d:t=h:width=%d:g=%d,",
-			frequency, width, gain)
+		filter.content += fmt.Sprintf("equalizer@%s=frequency=%.2f:width_type=h:width=%.2f:gain=%.2f,", id, frequency, width, gain)
 		return nil
 	}
 }
@@ -206,11 +203,17 @@ func WithAudioLoudnessNormaliseContent(intensity int, truePeak float64, range_ i
 	}
 }
 
-// WARN: DO NOT USE FOR NOW
-func WithAudioNoiseReductionContent(strength int) FilterOption {
+func WithFFTBroadBandNoiseFilter(id string, strength float32, rPatch float32, rSearch float32) FilterOption {
 	return func(filter *Filter) error {
-		// NOTE: anlmdn IS A NOISE REDUCTION FILTER. THIS MIGHT EFFECT THE QUALITY SIGNIFICANTLY - USE CAREFULLY
-		filter.content += fmt.Sprintf("anlmdn=s=%d,", strength)
+		// TODO: NEEDS A UPDATOR TO CONTROL NOISE SAMPLING
+		filter.content += fmt.Sprintf("")
+		return nil
+	}
+}
+
+func WithMeanBroadBandNoiseFilter(id string, strength float32, rPatch float32, rSearch float32) FilterOption {
+	return func(filter *Filter) error {
+		filter.content += fmt.Sprintf("anlmdn@%s=strength=%.2f:patch=%.2f:research=%.2f", id, strength, rPatch, rSearch)
 		return nil
 	}
 }
