@@ -2,7 +2,8 @@ package transcode
 
 import (
 	"github.com/asticode/go-astiav"
-	buffer "github.com/harshabose/tools/buffer/pkg"
+
+	"github.com/harshabose/tools/buffer/pkg"
 
 	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
 )
