@@ -200,6 +200,7 @@ func (encoder *Encoder) findParameterSets(extraData []byte) {
 }
 
 func (encoder *Encoder) UpdateBitrate(bitrate int64) {
-	// TODO: any pacers or post-processing is done here...
-	encoder.encoderContext.SetBitRate(bitrate)
+	// TODO: any pacers or post-processing is to be done here...
+	fmt.Println("encoder bitrate update to:", bitrate)
+	// encoder.encoderContext.SetBitRate(bitrate)
 }

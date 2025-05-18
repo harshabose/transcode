@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"strings"
 
-	buffer "github.com/harshabose/tools/buffer/pkg"
+	"github.com/harshabose/tools/buffer/pkg"
 
 	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
 )
@@ -18,7 +18,7 @@ type codecSettings interface {
 }
 
 type X264Opts struct {
-	// RateControl   string `x264-opts:"rate-control"`
+	// RateControl string `x264-opts:"rate-control"`
 	Bitrate       string `x264-opts:"bitrate"`
 	VBVMaxBitrate string `x264-opts:"vbv-maxrate"`
 	VBVBuffer     string `x264-opts:"vbv-bufsize"`
