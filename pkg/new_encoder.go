@@ -259,7 +259,7 @@ func (e *Encoder) updateBitrate(bitrate int64) error {
 
 	change := math.Abs(float64(current)-float64(bitrate)) / math.Abs(float64(current))
 
-	if change < 0.05 {
+	if change < 0.1 {
 		e.mux.Unlock()
 		fmt.Printf("change not appropriate; current: %d; new: %d; change:%f\n", current, bitrate, change)
 		return nil
