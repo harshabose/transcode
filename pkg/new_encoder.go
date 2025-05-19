@@ -232,11 +232,31 @@ func (e *Encoder) updateX264OptsWithNewBitrate(newBitrate int64) error {
 	x264opts := entry.Value()
 	parts := strings.Split(x264opts, ":")
 
-	// Find and replace bitrate part
-	for i, part := range parts {
-		if strings.HasPrefix(part, "bitrate=") {
-			parts[i] = fmt.Sprintf("bitrate=%d", newBitrate)
-			break
+	// Calculate VBV parameters based on bitrate
+	vbvMaxRate := newBitrate             // Same as target for CBR-like behavior
+	vbvBuffer := max(newBitrate/10, 100) // ~40ms buffer at target bitrate
+
+	// Update all VBV-related parameters
+	paramsToUpdate := map[string]string{
+		"bitrate":     fmt.Sprintf("%d", newBitrate),
+		"vbv-maxrate": fmt.Sprintf("%d", vbvMaxRate),
+		"vbv-bufsize": fmt.Sprintf("%d", vbvBuffer),
+	}
+
+	// Find and replace each parameter
+	for paramName, paramValue := range paramsToUpdate {
+		found := false
+		for i, part := range parts {
+			if strings.HasPrefix(part, paramName+"=") {
+				parts[i] = fmt.Sprintf("%s=%s", paramName, paramValue)
+				found = true
+				break
+			}
+		}
+
+		// If parameter not found, add it
+		if !found {
+			parts = append(parts, fmt.Sprintf("%s=%s", paramName, paramValue))
 		}
 	}
 
@@ -246,6 +266,13 @@ func (e *Encoder) updateX264OptsWithNewBitrate(newBitrate int64) error {
 
 // updateBitrate updates the bitrate on codecFlags. The bitrate units are kbps (kilobits per second)
 func (e *Encoder) updateBitrate(bitrate int64) error {
+	const maxReasonableBitrate = 50_000 // 50 Mbps max
+	if bitrate > maxReasonableBitrate {
+		fmt.Printf("🚫 Rejecting unreasonable bitrate: %d kbps (max: %d kbps)\n",
+			bitrate, maxReasonableBitrate)
+		return nil
+	}
+
 	start := time.Now()
 
 	e.mux.Lock()
@@ -259,7 +286,7 @@ func (e *Encoder) updateBitrate(bitrate int64) error {
 
 	change := math.Abs(float64(current)-float64(bitrate)) / math.Abs(float64(current))
 
-	if change < 0.1 {
+	if change < 0.5 || change > 2 {
 		e.mux.Unlock()
 		fmt.Printf("change not appropriate; current: %d; new: %d; change:%f\n", current, bitrate, change)
 		return nil
@@ -279,9 +306,14 @@ func (e *Encoder) updateBitrate(bitrate int64) error {
 		return err
 	}
 
+	updated, err := e.getCurrentBitrate()
+	if err != nil {
+		return err
+	}
+
 	duration := time.Since(start)
-	fmt.Printf("🔄 Bitrate updated: %d → %d (%.1f%%) in %v\n",
-		current, bitrate, change*100, duration)
+	fmt.Printf("🔄 Bitrate updated: %d → %d expected change: (%.1f%%) in %v\n",
+		current, updated, change*100, duration)
 
 	return nil
 }
