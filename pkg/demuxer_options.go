@@ -32,6 +32,18 @@ func WithRTSPInputOption(demuxer *Demuxer) error {
 	return nil
 }
 
+func WithFileInputOption(demuxer *Demuxer) error {
+	if err := demuxer.inputOptions.Set("re", "", 0); err != nil {
+		return err
+	}
+	// // Additional options for smooth playback
+	// if err := demuxer.inputOptions.Set("fflags", "+genpts", 0); err != nil {
+	// 	return err
+	// }
+
+	return nil
+}
+
 func WithAlsaInputFormatOption(demuxer *Demuxer) error {
 	demuxer.inputFormat = astiav.FindInputFormat("alsa")
 	return nil
@@ -39,6 +51,19 @@ func WithAlsaInputFormatOption(demuxer *Demuxer) error {
 
 func WithAvFoundationInputFormatOption(demuxer *Demuxer) error {
 	demuxer.inputFormat = astiav.FindInputFormat("avfoundation")
+
+	if err := demuxer.inputOptions.Set("video_size", "1280x720", 0); err != nil {
+		return err
+	}
+
+	if err := demuxer.inputOptions.Set("framerate", "30", 0); err != nil {
+		return err
+	}
+
+	if err := demuxer.inputOptions.Set("pixel_format", "uyvy422", 0); err != nil {
+		return err
+	}
+
 	return nil
 }
 

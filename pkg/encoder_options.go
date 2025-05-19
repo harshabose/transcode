@@ -1,8 +1,11 @@
 package transcode
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/asticode/go-astiav"
 
 	"github.com/harshabose/tools/buffer/pkg"
 
@@ -18,7 +21,7 @@ type codecSettings interface {
 }
 
 type X264Opts struct {
-	// RateControl string `x264-opts:"rate-control"`
+	// RateControl   string `x264-opts:"rate-control"`
 	Bitrate       string `x264-opts:"bitrate"`
 	VBVMaxBitrate string `x264-opts:"vbv-maxrate"`
 	VBVBuffer     string `x264-opts:"vbv-bufsize"`
@@ -45,7 +48,6 @@ func (x264 X264Opts) ForEach(fn func(string, string) error) error {
 	// Join all options with colons
 	if len(optParts) > 0 {
 		x264optsValue := strings.Join(optParts, ":")
-		// Set as a single parameter
 		if err := fn("x264opts", x264optsValue); err != nil {
 			return err
 		}
@@ -67,6 +69,7 @@ func (x264 X264Opts) ForEach(fn func(string, string) error) error {
 
 type X264OpenSettings struct {
 	X264Opts
+	RateControl   string `x264:"rc"`
 	Preset        string `x264:"preset"`        // exists
 	Tune          string `x264:"tune"`          // exists
 	Refs          string `x264:"refs"`          // exists
@@ -241,54 +244,109 @@ var HighQualityX264Settings = X264OpenSettings{
 	Aud:     "0",
 }
 
+var WebRTCOptimisedX264Settings = X264OpenSettings{
+	X264Opts: X264Opts{
+		// RateControl:   "cbr",
+		Bitrate:       "2500", // Keep your current target
+		VBVMaxBitrate: "2500", // Same as target!
+		VBVBuffer:     "100",  // 2500/30fps ≈ 83 kbits (single frame)
+		RateTol:       "1.0",  // More tolerance
+		SyncLookAhead: "0",    // Already correct
+		AnnexB:        "1",    // Already correct
+	},
+	LookAhead:     "0",   // Critical fix!
+	Qmin:          "16",  // Wider range
+	Qmax:          "45",  // Much wider range
+	Level:         "3.1", // Better compatibility
+	Preset:        "ultrafast",
+	Tune:          "zerolatency",
+	Refs:          "1",
+	Profile:       "baseline",
+	BFrames:       "0",
+	BAdapt:        "0",
+	NGOP:          "30",
+	NGOPMin:       "15",
+	Scenecut:      "0",
+	InfraRefresh:  "1",
+	SlicedThreads: "1",
+	ForceIDR:      "1",
+	AQMode:        "0",
+	AQStrength:    "0",
+	MBTree:        "0",
+
+	Threads: "0",
+	Aud:     "1",
+}
+
 func WithX264DefaultOptions(encoder *Encoder) error {
-	encoder.encoderSettings = DefaultX264Settings
-	return encoder.encoderSettings.ForEach(func(key, value string) error {
+	encoder.codecSettings = DefaultX264Settings
+
+	return encoder.codecSettings.ForEach(func(key, value string) error {
 		return encoder.codecFlags.Set(key, value, 0)
 	})
 }
 
 func WithX264HighQualityOptions(encoder *Encoder) error {
-	encoder.encoderSettings = HighQualityX264Settings
-	return encoder.encoderSettings.ForEach(func(key, value string) error {
+	encoder.codecSettings = HighQualityX264Settings
+
+	return encoder.codecSettings.ForEach(func(key, value string) error {
 		return encoder.codecFlags.Set(key, value, 0)
 	})
 }
 
 func WithX264LowLatencyOptions(encoder *Encoder) error {
-	encoder.encoderSettings = LowLatencyX264Settings
-	return encoder.encoderSettings.ForEach(func(key, value string) error {
+	encoder.codecSettings = LowLatencyX264Settings
+
+	return encoder.codecSettings.ForEach(func(key, value string) error {
+		return encoder.codecFlags.Set(key, value, 0)
+	})
+}
+
+func WithWebRTCOptimisedOptions(encoder *Encoder) error {
+	encoder.codecSettings = WebRTCOptimisedX264Settings
+
+	return encoder.codecSettings.ForEach(func(key, value string) error {
+		fmt.Printf("setting key (%s): value(%s)\n", key, value)
 		return encoder.codecFlags.Set(key, value, 0)
 	})
 }
 
 func WithX264LowBandwidthOptions(encoder *Encoder) error {
-	encoder.encoderSettings = LowBandwidthX264Settings
-	return encoder.encoderSettings.ForEach(func(key, value string) error {
+	encoder.codecSettings = LowBandwidthX264Settings
+
+	return encoder.codecSettings.ForEach(func(key, value string) error {
 		return encoder.codecFlags.Set(key, value, 0)
 	})
 }
 
-func withVideoSetEncoderContextParameters(filter *Filter) EncoderOption {
+func withVideoSetEncoderParameters(filter *Filter) EncoderOption {
 	return func(encoder *Encoder) error {
-		encoder.encoderContext.SetHeight(filter.sinkContext.Height())
-		encoder.encoderContext.SetWidth(filter.sinkContext.Width())
-		encoder.encoderContext.SetTimeBase(filter.sinkContext.TimeBase())
-		encoder.encoderContext.SetPixelFormat(filter.sinkContext.PixelFormat())
-		encoder.encoderContext.SetFramerate(filter.sinkContext.FrameRate())
+		withVideoSetEncoderContextParameter(filter, encoder.encoderContext)
 		return nil
 	}
 }
 
-func withAudioSetEncoderContextParameters(filter *Filter) EncoderOption {
+func withAudioSetEncoderParameters(filter *Filter) EncoderOption {
 	return func(encoder *Encoder) error {
-		encoder.encoderContext.SetTimeBase(filter.sinkContext.TimeBase())
-		encoder.encoderContext.SetSampleRate(filter.sinkContext.SampleRate())
-		encoder.encoderContext.SetSampleFormat(filter.sinkContext.SampleFormat())
-		encoder.encoderContext.SetChannelLayout(filter.sinkContext.ChannelLayout())
-		encoder.encoderContext.SetStrictStdCompliance(-2)
+		withAudioSetEncoderContextParameters(filter, encoder.encoderContext)
 		return nil
 	}
+}
+
+func withAudioSetEncoderContextParameters(filter *Filter, eCtx *astiav.CodecContext) {
+	eCtx.SetTimeBase(filter.sinkContext.TimeBase())
+	eCtx.SetSampleRate(filter.sinkContext.SampleRate())
+	eCtx.SetSampleFormat(filter.sinkContext.SampleFormat())
+	eCtx.SetChannelLayout(filter.sinkContext.ChannelLayout())
+	eCtx.SetStrictStdCompliance(-2)
+}
+
+func withVideoSetEncoderContextParameter(filter *Filter, eCtx *astiav.CodecContext) {
+	eCtx.SetHeight(filter.sinkContext.Height())
+	eCtx.SetWidth(filter.sinkContext.Width())
+	eCtx.SetTimeBase(filter.sinkContext.TimeBase())
+	eCtx.SetPixelFormat(filter.sinkContext.PixelFormat())
+	eCtx.SetFramerate(filter.sinkContext.FrameRate())
 }
 
 func WithEncoderBufferSize(size int) EncoderOption {
