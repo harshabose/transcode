@@ -13,7 +13,7 @@ import (
 )
 
 type (
-	EncoderOption = func(*Encoder) error
+	EncoderOption = func(encoder *Encoder) error
 )
 
 type codecSettings interface {
@@ -247,16 +247,16 @@ var HighQualityX264Settings = X264OpenSettings{
 var WebRTCOptimisedX264Settings = X264OpenSettings{
 	X264Opts: X264Opts{
 		// RateControl:   "cbr",
-		Bitrate:       "2500", // Keep your current target
-		VBVMaxBitrate: "2500", // Same as target!
-		VBVBuffer:     "100",  // 2500/30fps ≈ 83 kbits (single frame)
-		RateTol:       "1.0",  // More tolerance
-		SyncLookAhead: "0",    // Already correct
-		AnnexB:        "1",    // Already correct
+		Bitrate:       "800", // Keep your current target
+		VBVMaxBitrate: "900", // Same as target!
+		VBVBuffer:     "300", // 2500/30fps ≈ 83 kbits (single frame)
+		RateTol:       "0.1", // More tolerance
+		SyncLookAhead: "0",   // Already correct
+		AnnexB:        "1",   // Already correct
 	},
 	LookAhead:     "0",   // Critical fix!
-	Qmin:          "16",  // Wider range
-	Qmax:          "45",  // Much wider range
+	Qmin:          "26",  // Wider range
+	Qmax:          "42",  // Much wider range
 	Level:         "3.1", // Better compatibility
 	Preset:        "ultrafast",
 	Tune:          "zerolatency",
@@ -264,14 +264,14 @@ var WebRTCOptimisedX264Settings = X264OpenSettings{
 	Profile:       "baseline",
 	BFrames:       "0",
 	BAdapt:        "0",
-	NGOP:          "30",
-	NGOPMin:       "15",
+	NGOP:          "50",
+	NGOPMin:       "25",
 	Scenecut:      "0",
 	InfraRefresh:  "1",
 	SlicedThreads: "1",
 	ForceIDR:      "1",
-	AQMode:        "0",
-	AQStrength:    "0",
+	AQMode:        "1",
+	AQStrength:    "0.5",
 	MBTree:        "0",
 
 	Threads: "0",
@@ -319,19 +319,32 @@ func WithX264LowBandwidthOptions(encoder *Encoder) error {
 	})
 }
 
-func withVideoSetEncoderParameters(filter *Filter) EncoderOption {
-	return func(encoder *Encoder) error {
-		withVideoSetEncoderContextParameter(filter, encoder.encoderContext)
-		return nil
-	}
-}
-
-func withAudioSetEncoderParameters(filter *Filter) EncoderOption {
-	return func(encoder *Encoder) error {
-		withAudioSetEncoderContextParameters(filter, encoder.encoderContext)
-		return nil
-	}
-}
+//
+//
+// func WithDefaultVP8Options(encoder *VP8Encoder) error {
+// 	encoder.codecSettings = DefaultVP8Settings
+//
+// 	return encoder.codecSettings.ForEach(func(key, value string) error {
+// 		if value == "" {
+// 			return nil
+// 		}
+// 		return encoder.codecFlags.Set(key, value, 0)
+// 	})
+// }
+//
+// func withVideoSetEncoderParameters(filter *Filter) EncoderOption {
+// 	return func(encoder *VP8Encoder) error {
+// 		withVideoSetEncoderContextParameter(filter, encoder.encoderContext)
+// 		return nil
+// 	}
+// }
+//
+// func withAudioSetEncoderParameters(filter *Filter) EncoderOption {
+// 	return func(encoder *VP8Encoder) error {
+// 		withAudioSetEncoderContextParameters(filter, encoder.encoderContext)
+// 		return nil
+// 	}
+// }
 
 func withAudioSetEncoderContextParameters(filter *Filter, eCtx *astiav.CodecContext) {
 	eCtx.SetTimeBase(filter.sinkContext.TimeBase())
@@ -354,4 +367,41 @@ func WithEncoderBufferSize(size int) EncoderOption {
 		encoder.buffer = buffer.CreateChannelBuffer(encoder.ctx, size, internal.CreatePacketPool())
 		return nil
 	}
+}
+
+type VP8Settings struct {
+	Deadline string `vp8:"deadline"` // Real-time encoding
+	Bitrate  string `vp8:"b"`        // Target bitrate
+	MinRate  string `vp8:"minrate"`  // Minimum bitrate
+	MaxRate  string `vp8:"maxrate"`  // Maximum bitrate
+	BufSize  string `vp8:"bufsize"`  // Buffer size
+	CRF      string `vp8:"crf"`      // Quality setting
+	CPUUsed  string `vp8:"cpu-used"` // Speed preset
+}
+
+var DefaultVP8Settings = VP8Settings{
+	Deadline: "1",     // Real-time
+	Bitrate:  "2500k", // 2.5 Mbps
+	MinRate:  "2000k", // Min 2 Mbps
+	MaxRate:  "3000k", // Max 3 Mbps
+	BufSize:  "500k",  // 500kb buffer
+	CRF:      "10",    // Good quality
+	CPUUsed:  "8",     // Fastest
+}
+
+func (s VP8Settings) ForEach(fn func(key, value string) error) error {
+	t := reflect.TypeOf(s)
+	v := reflect.ValueOf(s)
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		tag := field.Tag.Get("vp8")
+		if tag != "" {
+			if err := fn(tag, v.Field(i).String()); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

@@ -18,7 +18,6 @@ type Filter struct {
 	decoder          *Decoder
 	buffer           buffer.BufferWithGenerator[astiav.Frame]
 	graph            *astiav.FilterGraph
-	updators         []Updator
 	input            *astiav.FilterInOut
 	output           *astiav.FilterInOut
 	srcContext       *astiav.BuffersrcFilterContext
@@ -127,9 +126,6 @@ func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *FilterCon
 
 func (filter *Filter) Start() {
 	go filter.loop()
-	for _, updator := range filter.updators {
-		updator.Start(filter)
-	}
 }
 
 func (filter *Filter) loop() {

@@ -2,6 +2,7 @@ package transcode
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"math"
@@ -232,11 +233,29 @@ func (e *Encoder) updateX264OptsWithNewBitrate(newBitrate int64) error {
 	x264opts := entry.Value()
 	parts := strings.Split(x264opts, ":")
 
-	// Calculate VBV parameters based on bitrate
-	vbvMaxRate := newBitrate             // Same as target for CBR-like behavior
-	vbvBuffer := max(newBitrate/10, 100) // ~40ms buffer at target bitrate
+	// Enforce level 3.1 limits (14,000 kbps max)
+	maxAllowedBitrate := int64(12000) // Stay below 14,000 limit
 
-	// Update all VBV-related parameters
+	// Clamp the new bitrate
+	if newBitrate > maxAllowedBitrate {
+		fmt.Printf("⚠️  Bitrate %d clamped to %d (level 3.1 limit)\n", newBitrate, maxAllowedBitrate)
+		newBitrate = maxAllowedBitrate
+	}
+
+	// Conservative VBV calculations within level limits
+	vbvMaxRate := min(newBitrate+200, maxAllowedBitrate) // Small headroom
+	vbvBuffer := min(newBitrate/2, 5000)                 // Cap buffer at 5000kb
+
+	// Ensure minimum values
+	if vbvBuffer < 200 {
+		vbvBuffer = 200
+	}
+
+	// Ensure maxrate > bitrate (but within limits)
+	if vbvMaxRate <= newBitrate {
+		vbvMaxRate = min(newBitrate+100, maxAllowedBitrate)
+	}
+
 	paramsToUpdate := map[string]string{
 		"bitrate":     fmt.Sprintf("%d", newBitrate),
 		"vbv-maxrate": fmt.Sprintf("%d", vbvMaxRate),
@@ -254,13 +273,15 @@ func (e *Encoder) updateX264OptsWithNewBitrate(newBitrate int64) error {
 			}
 		}
 
-		// If parameter not found, add it
 		if !found {
 			parts = append(parts, fmt.Sprintf("%s=%s", paramName, paramValue))
 		}
 	}
 
 	newX264opts := strings.Join(parts, ":")
+	fmt.Printf("🔧 Safe update: bitrate=%d, vbv-maxrate=%d, vbv-bufsize=%d\n",
+		newBitrate, vbvMaxRate, vbvBuffer)
+
 	return e.copyCodecFlags.Set("x264opts", newX264opts, 0)
 }
 
@@ -286,7 +307,7 @@ func (e *Encoder) updateBitrate(bitrate int64) error {
 
 	change := math.Abs(float64(current)-float64(bitrate)) / math.Abs(float64(current))
 
-	if change < 0.5 || change > 2 {
+	if change < 0.1 || change > 2 {
 		e.mux.Unlock()
 		fmt.Printf("change not appropriate; current: %d; new: %d; change:%f\n", current, bitrate, change)
 		return nil
@@ -375,6 +396,7 @@ func (e *Encoder) loop() {
 		case <-e.ctx.Done():
 			return
 		case bitrate := <-e.bandwidthChan:
+			fmt.Println("updated bitrate:", bitrate)
 			if err := e.updateBitrate(bitrate); err != nil {
 				fmt.Printf("error while encoding; err: %s\n", err.Error())
 			}
@@ -433,6 +455,13 @@ func (e *Encoder) findParameterSets(extraData []byte) {
 		}
 		fmt.Println("SPS for current encoder: ", e.sps)
 		fmt.Println("PPS for current encoder: ", e.pps)
+
+		// Convert to base64
+		spsBase64 := base64.StdEncoding.EncodeToString(e.sps)
+		ppsBase64 := base64.StdEncoding.EncodeToString(e.pps)
+
+		fmt.Printf("DefaultSPSBase64 = \"%s\"\n", spsBase64)
+		fmt.Printf("DefaultPPSBase64 = \"%s\"\n", ppsBase64)
 	}
 }
 
