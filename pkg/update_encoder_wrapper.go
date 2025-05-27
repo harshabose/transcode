@@ -116,10 +116,16 @@ func (u *UpdateEncoder) UpdateBitrate(bps int64) error {
 
 	newEncoder.Start()
 
+	// Wait for the first packet from the new encoder
+	// firstPacket := <-newEncoder.WaitForPacket()
+
 	u.mux.Lock()
 	oldEncoder := u.encoder
 	u.encoder = newEncoder
 	u.mux.Unlock()
+
+	// Put the first packet back for next WaitForPacket()
+	// newEncoder.PutBack(firstPacket)
 
 	if oldEncoder != nil {
 		oldEncoder.Stop()
@@ -198,4 +204,8 @@ func (u *UpdateEncoder) calculateBitrateChange(currentBps, newBps int64) (absolu
 	}
 
 	return absoluteChange, percentageChange
+}
+
+func (u *UpdateEncoder) swapSoon() {
+
 }
