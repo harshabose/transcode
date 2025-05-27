@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/asticode/go-astiav"
+
 	"github.com/harshabose/tools/buffer/pkg"
 )
 
@@ -48,7 +49,7 @@ func (pool *packetPool) Release() {
 		if !ok {
 			continue
 		}
-
+		// fmt.Printf("🗑️ Releasing packet: ptr=%p\n", packet)
 		packet.Free()
 	}
 }

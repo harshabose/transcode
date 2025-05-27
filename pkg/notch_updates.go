@@ -32,11 +32,11 @@ package transcode
 // )
 //
 // type Updator interface {
-// 	Start(*Filter)
+// 	Start(*GeneralFilter)
 // }
 //
 // func WithUpdateFilter(updator Updator) FilterOption {
-// 	return func(filter *Filter) error {
+// 	return func(filter *GeneralFilter) error {
 // 		filter.updators = append(filter.updators, updator)
 // 		return nil
 // 	}
@@ -203,7 +203,7 @@ package transcode
 // 	}
 // }
 //
-// func (update *PropNoiseFilterUpdator) loop3(filter *Filter) {
+// func (update *PropNoiseFilterUpdator) loop3(filter *GeneralFilter) {
 // 	ticker := time.NewTicker(update.interval)
 // 	defer ticker.Stop()
 //
@@ -219,13 +219,13 @@ package transcode
 // 	}
 // }
 //
-// func (update *PropNoiseFilterUpdator) Start(filter *Filter) {
+// func (update *PropNoiseFilterUpdator) Start(filter *GeneralFilter) {
 // 	go update.loop1()
 // 	go update.loop2()
 // 	go update.loop3(filter)
 // }
 //
-// func (update *PropNoiseFilterUpdator) update(filter *Filter) error {
+// func (update *PropNoiseFilterUpdator) update(filter *GeneralFilter) error {
 // 	if filter == nil {
 // 		return errors.New("filter is nil")
 // 	}

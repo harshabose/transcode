@@ -6,7 +6,9 @@ var (
 	ErrorAllocateFormatContext = errors.New("error allocate format context")
 	ErrorOpenInputContainer    = errors.New("error opening container")
 	ErrorNoStreamFound         = errors.New("error no stream found")
+	ErrorGeneralAllocate       = errors.New("error allocating general object")
 	ErrorNoVideoStreamFound    = errors.New("no video stream found")
+	ErrorInterfaceMismatch     = errors.New("interface mismatch")
 
 	ErrorNoCodecFound         = errors.New("error no codec found")
 	ErrorAllocateCodecContext = errors.New("error allocating codec context")

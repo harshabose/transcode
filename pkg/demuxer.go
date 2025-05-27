@@ -2,17 +2,15 @@ package transcode
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/asticode/go-astiav"
 
-	"github.com/harshabose/tools/buffer/pkg"
-
 	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
+	"github.com/harshabose/tools/buffer/pkg"
 )
 
-type Demuxer struct {
+type GeneralDemuxer struct {
 	formatContext   *astiav.FormatContext
 	inputOptions    *astiav.Dictionary
 	inputFormat     *astiav.InputFormat
@@ -20,18 +18,25 @@ type Demuxer struct {
 	codecParameters *astiav.CodecParameters
 	buffer          buffer.BufferWithGenerator[astiav.Packet]
 	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
-func CreateDemuxer(ctx context.Context, containerAddress string, options ...DemuxerOption) (*Demuxer, error) {
+func CreateGeneralDemuxer(ctx context.Context, containerAddress string, options ...DemuxerOption) (*GeneralDemuxer, error) {
+	ctx2, cancel := context.WithCancel(ctx)
 	astiav.RegisterAllDevices()
-	demuxer := &Demuxer{
+	demuxer := &GeneralDemuxer{
 		formatContext: astiav.AllocFormatContext(),
 		inputOptions:  astiav.NewDictionary(),
-		ctx:           ctx,
+		ctx:           ctx2,
+		cancel:        cancel,
 	}
 
 	if demuxer.formatContext == nil {
 		return nil, ErrorAllocateFormatContext
+	}
+
+	if demuxer.inputOptions == nil {
+		return nil, ErrorGeneralAllocate
 	}
 
 	for _, option := range options {
@@ -65,22 +70,27 @@ func CreateDemuxer(ctx context.Context, containerAddress string, options ...Demu
 	return demuxer, nil
 }
 
-func (demuxer *Demuxer) Start() {
+func (demuxer *GeneralDemuxer) Ctx() context.Context {
+	return demuxer.ctx
+}
+
+func (demuxer *GeneralDemuxer) Start() {
 	go demuxer.loop()
 }
 
-func (demuxer *Demuxer) loop() {
-	defer demuxer.close()
+func (demuxer *GeneralDemuxer) Stop() {
+	demuxer.cancel()
+}
 
-	ticker := time.NewTicker(time.Millisecond)
-	defer ticker.Stop()
+func (demuxer *GeneralDemuxer) loop() {
+	defer demuxer.close()
 
 loop1:
 	for {
 		select {
 		case <-demuxer.ctx.Done():
 			return
-		case <-ticker.C:
+		default:
 		loop2:
 			for {
 				packet := demuxer.buffer.Generate()
@@ -105,32 +115,63 @@ loop1:
 	}
 }
 
-func (demuxer *Demuxer) pushPacket(packet *astiav.Packet) error {
+func (demuxer *GeneralDemuxer) pushPacket(packet *astiav.Packet) error {
 	ctx, cancel := context.WithTimeout(demuxer.ctx, time.Second) // TODO: NEEDS TO BE BASED ON FPS ON INPUT_FORMAT
 	defer cancel()
 
 	return demuxer.buffer.Push(ctx, packet)
 }
 
-func (demuxer *Demuxer) WaitForPacket() chan *astiav.Packet {
+func (demuxer *GeneralDemuxer) WaitForPacket() chan *astiav.Packet {
 	return demuxer.buffer.GetChannel()
 }
 
-func (demuxer *Demuxer) GetPacket() (*astiav.Packet, error) {
+func (demuxer *GeneralDemuxer) GetPacket() (*astiav.Packet, error) {
 	ctx, cancel := context.WithTimeout(demuxer.ctx, time.Second)
 	defer cancel()
 
 	return demuxer.buffer.Pop(ctx)
 }
 
-func (demuxer *Demuxer) PutBack(packet *astiav.Packet) {
+func (demuxer *GeneralDemuxer) PutBack(packet *astiav.Packet) {
 	demuxer.buffer.PutBack(packet)
 }
 
-func (demuxer *Demuxer) close() {
+func (demuxer *GeneralDemuxer) close() {
 	if demuxer.formatContext != nil {
 		demuxer.formatContext.CloseInput()
-		fmt.Println("closed container")
 		demuxer.formatContext.Free()
 	}
+}
+
+func (demuxer *GeneralDemuxer) SetInputOption(key, value string, flags astiav.DictionaryFlags) error {
+	return demuxer.inputOptions.Set(key, value, flags)
+}
+
+func (demuxer *GeneralDemuxer) SetInputFormat(format *astiav.InputFormat) {
+	demuxer.inputFormat = format
+}
+
+func (demuxer *GeneralDemuxer) SetBuffer(buffer buffer.BufferWithGenerator[astiav.Packet]) {
+	demuxer.buffer = buffer
+}
+
+func (demuxer *GeneralDemuxer) GetCodecParameters() *astiav.CodecParameters {
+	return demuxer.codecParameters
+}
+
+func (demuxer *GeneralDemuxer) MediaType() astiav.MediaType {
+	return demuxer.codecParameters.MediaType()
+}
+
+func (demuxer *GeneralDemuxer) CodecID() astiav.CodecID {
+	return demuxer.codecParameters.CodecID()
+}
+
+func (demuxer *GeneralDemuxer) FrameRate() astiav.Rational {
+	return demuxer.formatContext.GuessFrameRate(demuxer.stream, nil)
+}
+
+func (demuxer *GeneralDemuxer) TimeBase() astiav.Rational {
+	return demuxer.stream.TimeBase()
 }

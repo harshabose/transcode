@@ -13,9 +13,9 @@ import (
 	"github.com/harshabose/simple_webrtc_comm/transcode/internal"
 )
 
-type Filter struct {
+type GeneralFilter struct {
 	content          string
-	decoder          *Decoder
+	decoder          CanProduceMediaFrame
 	buffer           buffer.BufferWithGenerator[astiav.Frame]
 	graph            *astiav.FilterGraph
 	input            *astiav.FilterInOut
@@ -25,52 +25,55 @@ type Filter struct {
 	srcContextParams *astiav.BuffersrcFilterContextParameters // NOTE: THIS BECOMES NIL AFTER INITIALISATION
 	mux              sync.RWMutex
 	ctx              context.Context
+	cancel           context.CancelFunc
 }
 
-func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *FilterConfig, options ...FilterOption) (*Filter, error) {
-	var (
-		filter        *Filter
-		filterSrc     *astiav.Filter
-		filterSink    *astiav.Filter
-		contextOption FilterOption
-		err           error
-	)
-	filter = &Filter{
+func CreateGeneralFilter(ctx context.Context, canProduceMediaFrame CanProduceMediaFrame, filterConfig FilterConfig, options ...FilterOption) (*GeneralFilter, error) {
+	ctx2, cancel := context.WithCancel(ctx)
+	filter := &GeneralFilter{
 		graph:            astiav.AllocFilterGraph(),
-		decoder:          decoder,
+		decoder:          canProduceMediaFrame,
 		input:            astiav.AllocFilterInOut(),
 		output:           astiav.AllocFilterInOut(),
 		srcContextParams: astiav.AllocBuffersrcFilterContextParameters(),
-		ctx:              ctx,
+		ctx:              ctx2,
+		cancel:           cancel,
 	}
 
 	// TODO: CHECK IF ALL ATTRIBUTES ARE ALLOCATED PROPERLY
 
-	if filterSrc = astiav.FindFilterByName(filterConfig.Source.String()); filterSrc == nil {
-		return nil, ErrorNoFilterName
-	}
-	if filterSink = astiav.FindFilterByName(filterConfig.Sink.String()); filterSink == nil {
+	filterSrc := astiav.FindFilterByName(filterConfig.Source.String())
+	if filterSrc == nil {
 		return nil, ErrorNoFilterName
 	}
 
-	if filter.srcContext, err = filter.graph.NewBuffersrcFilterContext(filterSrc, "in"); err != nil {
+	filterSink := astiav.FindFilterByName(filterConfig.Sink.String())
+	if filterSink == nil {
+		return nil, ErrorNoFilterName
+	}
+
+	srcContext, err := filter.graph.NewBuffersrcFilterContext(filterSrc, "in")
+	if err != nil {
 		return nil, ErrorAllocSrcContext
 	}
+	filter.srcContext = srcContext
 
-	if filter.sinkContext, err = filter.graph.NewBuffersinkFilterContext(filterSink, "out"); err != nil {
+	sinkContext, err := filter.graph.NewBuffersinkFilterContext(filterSink, "out")
+	if err != nil {
 		return nil, ErrorAllocSinkContext
 	}
+	filter.sinkContext = sinkContext
 
-	if decoder.decoderContext.MediaType() == astiav.MediaTypeVideo {
-		fmt.Println("video media type detected")
-		contextOption = withVideoSetFilterContextParameters(decoder)
+	canDescribeMediaFrame, ok := canProduceMediaFrame.(CanDescribeMediaFrame)
+	if !ok {
+		return nil, ErrorInterfaceMismatch
 	}
-	if decoder.decoderContext.MediaType() == astiav.MediaTypeAudio {
-		fmt.Println("audio media type detected")
-		contextOption = withAudioSetFilterContextParameters(decoder)
+	if canDescribeMediaFrame.MediaType() == astiav.MediaTypeVideo {
+		options = append([]FilterOption{withVideoSetFilterContextParameters(canDescribeMediaFrame)}, options...)
 	}
-
-	options = append([]FilterOption{contextOption}, options...)
+	if canDescribeMediaFrame.MediaType() == astiav.MediaTypeAudio {
+		options = append([]FilterOption{withAudioSetFilterContextParameters(canDescribeMediaFrame)}, options...)
+	}
 
 	for _, option := range options {
 		if err = option(filter); err != nil {
@@ -87,13 +90,9 @@ func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *FilterCon
 		return nil, ErrorSrcContextSetParameter
 	}
 
-	fmt.Println("check1")
-
 	if err = filter.srcContext.Initialize(astiav.NewDictionary()); err != nil {
 		return nil, ErrorSrcContextInitialise
 	}
-
-	fmt.Println("check2")
 
 	filter.output.SetName("in")
 	filter.output.SetFilterContext(filter.srcContext.FilterContext())
@@ -124,11 +123,19 @@ func CreateFilter(ctx context.Context, decoder *Decoder, filterConfig *FilterCon
 	return filter, nil
 }
 
-func (filter *Filter) Start() {
+func (filter *GeneralFilter) Ctx() context.Context {
+	return filter.ctx
+}
+
+func (filter *GeneralFilter) Start() {
 	go filter.loop()
 }
 
-func (filter *Filter) loop() {
+func (filter *GeneralFilter) Stop() {
+	filter.cancel()
+}
+
+func (filter *GeneralFilter) loop() {
 	var (
 		err       error = nil
 		srcFrame  *astiav.Frame
@@ -166,29 +173,22 @@ loop1:
 	}
 }
 
-func (filter *Filter) pushFrame(frame *astiav.Frame) error {
+func (filter *GeneralFilter) pushFrame(frame *astiav.Frame) error {
 	ctx, cancel := context.WithTimeout(filter.ctx, time.Second)
 	defer cancel()
 
 	return filter.buffer.Push(ctx, frame)
 }
 
-func (filter *Filter) GetFrame() (*astiav.Frame, error) {
-	ctx, cancel := context.WithTimeout(filter.ctx, time.Second)
-	defer cancel()
-
-	return filter.buffer.Pop(ctx)
-}
-
-func (filter *Filter) PutBack(frame *astiav.Frame) {
+func (filter *GeneralFilter) PutBack(frame *astiav.Frame) {
 	filter.buffer.PutBack(frame)
 }
 
-func (filter *Filter) WaitForFrame() chan *astiav.Frame {
+func (filter *GeneralFilter) WaitForFrame() chan *astiav.Frame {
 	return filter.buffer.GetChannel()
 }
 
-func (filter *Filter) close() {
+func (filter *GeneralFilter) close() {
 	if filter.graph != nil {
 		filter.graph.Free()
 	}
@@ -198,4 +198,104 @@ func (filter *Filter) close() {
 	if filter.output != nil {
 		filter.output.Free()
 	}
+}
+
+func (filter *GeneralFilter) SetBuffer(buffer buffer.BufferWithGenerator[astiav.Frame]) {
+	filter.buffer = buffer
+}
+
+func (filter *GeneralFilter) AddToFilterContent(content string) {
+	filter.content += content
+}
+
+func (filter *GeneralFilter) SetFrameRate(describe CanDescribeFrameRate) {
+	filter.srcContextParams.SetFramerate(describe.FrameRate())
+}
+
+func (filter *GeneralFilter) SetTimeBase(describe CanDescribeTimeBase) {
+	filter.srcContextParams.SetTimeBase(describe.TimeBase())
+}
+
+func (filter *GeneralFilter) SetHeight(describe CanDescribeMediaVideoFrame) {
+	filter.srcContextParams.SetHeight(describe.Height())
+}
+
+func (filter *GeneralFilter) SetWidth(describe CanDescribeMediaVideoFrame) {
+	filter.srcContextParams.SetWidth(describe.Width())
+}
+
+func (filter *GeneralFilter) SetPixelFormat(describe CanDescribeMediaVideoFrame) {
+	filter.srcContextParams.SetPixelFormat(describe.PixelFormat())
+}
+
+func (filter *GeneralFilter) SetSampleAspectRatio(describe CanDescribeMediaVideoFrame) {
+	filter.srcContextParams.SetSampleAspectRatio(describe.SampleAspectRatio())
+}
+
+func (filter *GeneralFilter) SetColorSpace(describe CanDescribeMediaVideoFrame) {
+	filter.srcContextParams.SetColorSpace(describe.ColorSpace())
+}
+
+func (filter *GeneralFilter) SetColorRange(describe CanDescribeMediaVideoFrame) {
+	filter.srcContextParams.SetColorRange(describe.ColorRange())
+}
+
+func (filter *GeneralFilter) SetSampleRate(describe CanDescribeMediaAudioFrame) {
+	filter.srcContextParams.SetSampleRate(describe.SampleRate())
+}
+
+func (filter *GeneralFilter) SetSampleFormat(describe CanDescribeMediaAudioFrame) {
+	filter.srcContextParams.SetSampleFormat(describe.SampleFormat())
+}
+
+func (filter *GeneralFilter) SetChannelLayout(describe CanDescribeMediaAudioFrame) {
+	filter.srcContextParams.SetChannelLayout(describe.ChannelLayout())
+}
+
+func (filter *GeneralFilter) MediaType() astiav.MediaType {
+	return filter.sinkContext.MediaType()
+}
+
+func (filter *GeneralFilter) FrameRate() astiav.Rational {
+	return filter.sinkContext.FrameRate()
+}
+
+func (filter *GeneralFilter) TimeBase() astiav.Rational {
+	return filter.sinkContext.TimeBase()
+}
+
+func (filter *GeneralFilter) Height() int {
+	return filter.sinkContext.Height()
+}
+
+func (filter *GeneralFilter) Width() int {
+	return filter.sinkContext.Width()
+}
+
+func (filter *GeneralFilter) PixelFormat() astiav.PixelFormat {
+	return filter.sinkContext.PixelFormat()
+}
+
+func (filter *GeneralFilter) SampleAspectRatio() astiav.Rational {
+	return filter.sinkContext.SampleAspectRatio()
+}
+
+func (filter *GeneralFilter) ColorSpace() astiav.ColorSpace {
+	return filter.sinkContext.ColorSpace()
+}
+
+func (filter *GeneralFilter) ColorRange() astiav.ColorRange {
+	return filter.sinkContext.ColorRange()
+}
+
+func (filter *GeneralFilter) SampleRate() int {
+	return filter.sinkContext.SampleRate()
+}
+
+func (filter *GeneralFilter) SampleFormat() astiav.SampleFormat {
+	return filter.sinkContext.SampleFormat()
+}
+
+func (filter *GeneralFilter) ChannelLayout() astiav.ChannelLayout {
+	return filter.sinkContext.ChannelLayout()
 }
