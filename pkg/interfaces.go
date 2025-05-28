@@ -45,12 +45,12 @@ type CanDescribeMediaPacket interface {
 }
 
 type CanProduceMediaPacket interface {
-	WaitForPacket() chan *astiav.Packet
+	GetPacket(ctx context.Context) (*astiav.Packet, error)
 	PutBack(*astiav.Packet)
 }
 
 type CanProduceMediaFrame interface {
-	WaitForFrame() chan *astiav.Frame
+	GetFrame(ctx context.Context) (*astiav.Frame, error)
 	PutBack(*astiav.Frame)
 }
 

@@ -95,11 +95,6 @@ func (encoder *GeneralEncoder) TimeBase() astiav.Rational {
 }
 
 func (encoder *GeneralEncoder) loop() {
-	var (
-		frame  *astiav.Frame
-		packet *astiav.Packet
-		err    error
-	)
 	defer encoder.close()
 
 loop1:
@@ -107,8 +102,13 @@ loop1:
 		select {
 		case <-encoder.ctx.Done():
 			return
-		case frame = <-encoder.filter.WaitForFrame():
-			if err = encoder.encoderContext.SendFrame(frame); err != nil {
+		default:
+			frame, err := encoder.getFrame()
+			if err != nil {
+				// fmt.Println("unable to get packet from encoder; err:", err.Error())
+				continue
+			}
+			if err := encoder.encoderContext.SendFrame(frame); err != nil {
 				encoder.filter.PutBack(frame)
 				if !errors.Is(err, astiav.ErrEagain) {
 					continue loop1
@@ -116,13 +116,13 @@ loop1:
 			}
 		loop2:
 			for {
-				packet = encoder.buffer.Generate()
+				packet := encoder.buffer.Generate()
 				if err = encoder.encoderContext.ReceivePacket(packet); err != nil {
 					encoder.buffer.PutBack(packet)
 					break loop2
 				}
 
-				if err = encoder.pushPacket(packet); err != nil {
+				if err := encoder.pushPacket(packet); err != nil {
 					encoder.buffer.PutBack(packet)
 					continue loop2
 				}
@@ -132,12 +132,19 @@ loop1:
 	}
 }
 
-func (encoder *GeneralEncoder) WaitForPacket() chan *astiav.Packet {
-	return encoder.buffer.GetChannel()
+func (encoder *GeneralEncoder) getFrame() (*astiav.Frame, error) {
+	ctx, cancel := context.WithTimeout(encoder.ctx, 50*time.Millisecond)
+	defer cancel()
+
+	return encoder.filter.GetFrame(ctx)
+}
+
+func (encoder *GeneralEncoder) GetPacket(ctx context.Context) (*astiav.Packet, error) {
+	return encoder.buffer.Pop(ctx)
 }
 
 func (encoder *GeneralEncoder) pushPacket(packet *astiav.Packet) error {
-	ctx, cancel := context.WithTimeout(encoder.ctx, time.Second)
+	ctx, cancel := context.WithTimeout(encoder.ctx, 50*time.Millisecond)
 	defer cancel()
 
 	return encoder.buffer.Push(ctx, packet)

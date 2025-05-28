@@ -1,6 +1,8 @@
 package transcode
 
 import (
+	"context"
+
 	"github.com/asticode/go-astiav"
 )
 
@@ -45,8 +47,8 @@ func (t *Transcoder) Stop() {
 	t.demuxer.Stop()
 }
 
-func (t *Transcoder) WaitForPacket() chan *astiav.Packet {
-	return t.encoder.WaitForPacket()
+func (t *Transcoder) GetPacket(ctx context.Context) (*astiav.Packet, error) {
+	return t.encoder.GetPacket(ctx)
 }
 
 func (t *Transcoder) PutBack(packet *astiav.Packet) {

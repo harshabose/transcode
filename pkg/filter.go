@@ -3,7 +3,6 @@ package transcode
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/asticode/go-astiav"
@@ -23,7 +22,6 @@ type GeneralFilter struct {
 	srcContext       *astiav.BuffersrcFilterContext
 	sinkContext      *astiav.BuffersinkFilterContext
 	srcContextParams *astiav.BuffersrcFilterContextParameters // NOTE: THIS BECOMES NIL AFTER INITIALISATION
-	mux              sync.RWMutex
 	ctx              context.Context
 	cancel           context.CancelFunc
 }
@@ -136,11 +134,6 @@ func (filter *GeneralFilter) Stop() {
 }
 
 func (filter *GeneralFilter) loop() {
-	var (
-		err       error = nil
-		srcFrame  *astiav.Frame
-		sinkFrame *astiav.Frame
-	)
 	defer filter.close()
 
 loop1:
@@ -148,44 +141,54 @@ loop1:
 		select {
 		case <-filter.ctx.Done():
 			return
-		case srcFrame = <-filter.decoder.WaitForFrame():
-			filter.mux.Lock()
-			if err = filter.srcContext.AddFrame(srcFrame, astiav.NewBuffersrcFlags(astiav.BuffersrcFlagKeepRef)); err != nil {
+		default:
+			srcFrame, err := filter.getFrame()
+			if err != nil {
+				// fmt.Println("unable to get frame from decoder; err:", err.Error())
+				continue
+			}
+			if err := filter.srcContext.AddFrame(srcFrame, astiav.NewBuffersrcFlags(astiav.BuffersrcFlagKeepRef)); err != nil {
 				filter.buffer.PutBack(srcFrame)
 				continue loop1
 			}
 		loop2:
 			for {
-				sinkFrame = filter.buffer.Generate()
+				sinkFrame := filter.buffer.Generate()
 				if err = filter.sinkContext.GetFrame(sinkFrame, astiav.NewBuffersinkFlags()); err != nil {
 					filter.buffer.PutBack(sinkFrame)
 					break loop2
 				}
 
-				if err = filter.pushFrame(sinkFrame); err != nil {
+				if err := filter.pushFrame(sinkFrame); err != nil {
 					filter.buffer.PutBack(sinkFrame)
 					continue loop2
 				}
 			}
 			filter.decoder.PutBack(srcFrame)
-			filter.mux.Unlock()
 		}
 	}
 }
 
 func (filter *GeneralFilter) pushFrame(frame *astiav.Frame) error {
-	ctx, cancel := context.WithTimeout(filter.ctx, time.Second)
+	ctx, cancel := context.WithTimeout(filter.ctx, 50*time.Millisecond)
 	defer cancel()
 
 	return filter.buffer.Push(ctx, frame)
+}
+
+func (filter *GeneralFilter) getFrame() (*astiav.Frame, error) {
+	ctx, cancel := context.WithTimeout(filter.ctx, 50*time.Millisecond)
+	defer cancel()
+
+	return filter.decoder.GetFrame(ctx)
 }
 
 func (filter *GeneralFilter) PutBack(frame *astiav.Frame) {
 	filter.buffer.PutBack(frame)
 }
 
-func (filter *GeneralFilter) WaitForFrame() chan *astiav.Frame {
-	return filter.buffer.GetChannel()
+func (filter *GeneralFilter) GetFrame(ctx context.Context) (*astiav.Frame, error) {
+	return filter.buffer.Pop(ctx)
 }
 
 func (filter *GeneralFilter) close() {

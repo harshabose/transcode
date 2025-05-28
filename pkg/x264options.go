@@ -119,9 +119,9 @@ var LowLatencyBitrateControlled = &X264Options{
 	Tune:    "zerolatency",
 
 	X264AdvancedOptions: &X264AdvancedOptions{
-		Bitrate:       "800", // 800kbps
-		VBVMaxBitrate: "800",
-		VBVBuffer:     "400",
+		Bitrate:       "500", // 800kbps
+		VBVMaxBitrate: "500",
+		VBVBuffer:     "250",
 		RateTolerance: "1", // 1% rate tolerance
 		MaxGOP:        "25",
 		MinGOP:        "13",

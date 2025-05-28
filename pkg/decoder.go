@@ -79,12 +79,6 @@ func (decoder *GeneralDecoder) Stop() {
 }
 
 func (decoder *GeneralDecoder) loop() {
-	var (
-		packet *astiav.Packet
-		frame  *astiav.Frame
-		err    error
-	)
-
 	defer decoder.close()
 
 loop1:
@@ -92,7 +86,12 @@ loop1:
 		select {
 		case <-decoder.ctx.Done():
 			return
-		case packet = <-decoder.demuxer.WaitForPacket():
+		default:
+			packet, err := decoder.getPacket()
+			if err != nil {
+				// fmt.Println("unable to get packet from demuxer; err:", err.Error())
+				continue
+			}
 			if err := decoder.decoderContext.SendPacket(packet); err != nil {
 				decoder.demuxer.PutBack(packet)
 				if !errors.Is(err, astiav.ErrEagain) {
@@ -101,7 +100,7 @@ loop1:
 			}
 		loop2:
 			for {
-				frame = decoder.buffer.Generate()
+				frame := decoder.buffer.Generate()
 				if err := decoder.decoderContext.ReceiveFrame(frame); err != nil {
 					decoder.buffer.PutBack(frame)
 					break loop2
@@ -109,7 +108,7 @@ loop1:
 
 				frame.SetPictureType(astiav.PictureTypeNone)
 
-				if err = decoder.pushFrame(frame); err != nil {
+				if err := decoder.pushFrame(frame); err != nil {
 					decoder.buffer.PutBack(frame)
 					continue loop2
 				}
@@ -120,14 +119,21 @@ loop1:
 }
 
 func (decoder *GeneralDecoder) pushFrame(frame *astiav.Frame) error {
-	ctx, cancel := context.WithTimeout(decoder.ctx, time.Second)
+	ctx, cancel := context.WithTimeout(decoder.ctx, 50*time.Millisecond)
 	defer cancel()
 
 	return decoder.buffer.Push(ctx, frame)
 }
 
-func (decoder *GeneralDecoder) WaitForFrame() chan *astiav.Frame {
-	return decoder.buffer.GetChannel()
+func (decoder *GeneralDecoder) getPacket() (*astiav.Packet, error) {
+	ctx, cancel := context.WithTimeout(decoder.ctx, 50*time.Millisecond)
+	defer cancel()
+
+	return decoder.demuxer.GetPacket(ctx)
+}
+
+func (decoder *GeneralDecoder) GetFrame(ctx context.Context) (*astiav.Frame, error) {
+	return decoder.buffer.Pop(ctx)
 }
 
 func (decoder *GeneralDecoder) PutBack(frame *astiav.Frame) {

@@ -116,20 +116,13 @@ loop1:
 }
 
 func (demuxer *GeneralDemuxer) pushPacket(packet *astiav.Packet) error {
-	ctx, cancel := context.WithTimeout(demuxer.ctx, time.Second) // TODO: NEEDS TO BE BASED ON FPS ON INPUT_FORMAT
+	ctx, cancel := context.WithTimeout(demuxer.ctx, 50*time.Millisecond) // TODO: NEEDS TO BE BASED ON FPS ON INPUT_FORMAT
 	defer cancel()
 
 	return demuxer.buffer.Push(ctx, packet)
 }
 
-func (demuxer *GeneralDemuxer) WaitForPacket() chan *astiav.Packet {
-	return demuxer.buffer.GetChannel()
-}
-
-func (demuxer *GeneralDemuxer) GetPacket() (*astiav.Packet, error) {
-	ctx, cancel := context.WithTimeout(demuxer.ctx, time.Second)
-	defer cancel()
-
+func (demuxer *GeneralDemuxer) GetPacket(ctx context.Context) (*astiav.Packet, error) {
 	return demuxer.buffer.Pop(ctx)
 }
 
