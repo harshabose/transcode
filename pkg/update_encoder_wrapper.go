@@ -19,6 +19,14 @@ type UpdateConfig struct {
 	CutVideoBelowMinBitrate bool
 }
 
+func (c UpdateConfig) validate() error {
+	if c.MinBitrate > c.MaxBitrate {
+		return fmt.Errorf("minimum bitrate is higher than maximum bitrate in the update encoder config")
+	}
+
+	return nil
+}
+
 type UpdateEncoder struct {
 	encoder Encoder
 	config  UpdateConfig
@@ -39,6 +47,10 @@ func NewUpdateEncoder(ctx context.Context, config UpdateConfig, builder *General
 		resume:  make(chan struct{}),
 		buffer:  buffer.CreateChannelBuffer(ctx, 30, internal.CreatePacketPool()),
 		ctx:     ctx,
+	}
+
+	if err := config.validate(); err != nil {
+		return nil, err
 	}
 
 	encoder, err := builder.Build(ctx)
@@ -105,7 +117,7 @@ func (u *UpdateEncoder) UpdateBitrate(bps int64) error {
 		return err
 	}
 
-	_, change := u.calculateBitrateChange(current, bps)
+	_, change := calculateBitrateChange(current, bps)
 	if change < 5 {
 		return nil
 	}
@@ -200,7 +212,7 @@ func (u *UpdateEncoder) GetParameterSets() (sps []byte, pps []byte, err error) {
 	return p.GetParameterSets()
 }
 
-func (u *UpdateEncoder) calculateBitrateChange(currentBps, newBps int64) (absoluteChange int64, percentageChange float64) {
+func calculateBitrateChange(currentBps, newBps int64) (absoluteChange int64, percentageChange float64) {
 	absoluteChange = newBps - currentBps
 	if absoluteChange < 0 {
 		absoluteChange = -absoluteChange
@@ -215,13 +227,12 @@ func (u *UpdateEncoder) calculateBitrateChange(currentBps, newBps int64) (absolu
 
 func (u *UpdateEncoder) getPacket() (*astiav.Packet, error) {
 	u.mux.RLock()
-	encoder := u.encoder // Get reference
-	u.mux.RUnlock()      // Release lock immediately
+	defer u.mux.RUnlock()
 
-	if encoder != nil {
+	if u.encoder != nil {
 		ctx, cancel := context.WithTimeout(u.ctx, 50*time.Millisecond)
 		defer cancel()
-		return encoder.GetPacket(ctx) // Don't hold lock during blocking call
+		return u.encoder.GetPacket(ctx) // Don't hold lock during blocking call
 	}
 
 	return nil, errors.New("encoder is nil")

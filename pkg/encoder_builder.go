@@ -31,6 +31,11 @@ func (b *GeneralEncoderBuilder) UpdateBitrate(bps int64) error {
 	return s.UpdateBitrate(bps)
 }
 
+func (b *GeneralEncoderBuilder) BuildWithProducer(ctx context.Context, producer CanProduceMediaFrame) (Encoder, error) {
+	b.producer = producer
+	return b.Build(ctx)
+}
+
 func (b *GeneralEncoderBuilder) Build(ctx context.Context) (Encoder, error) {
 	codec := astiav.FindEncoder(b.codecID)
 	if codec == nil {
@@ -39,7 +44,7 @@ func (b *GeneralEncoderBuilder) Build(ctx context.Context) (Encoder, error) {
 
 	ctx2, cancel := context.WithCancel(ctx)
 	encoder := &GeneralEncoder{
-		filter:     b.producer,
+		producer:   b.producer,
 		codec:      codec,
 		codecFlags: astiav.NewDictionary(),
 		ctx:        ctx2,
@@ -51,7 +56,7 @@ func (b *GeneralEncoderBuilder) Build(ctx context.Context) (Encoder, error) {
 		return nil, ErrorAllocateCodecContext
 	}
 
-	canDescribeMediaFrame, ok := b.producer.(CanDescribeMediaFrame)
+	canDescribeMediaFrame, ok := encoder.producer.(CanDescribeMediaFrame)
 	if !ok {
 		return nil, ErrorInterfaceMismatch
 	}

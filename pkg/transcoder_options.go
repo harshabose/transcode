@@ -68,3 +68,16 @@ func WithBitrateControlEncoder(ctx context.Context, codecID astiav.CodecID, bitr
 		return nil
 	}
 }
+
+func WithMultiEncoderBitrateControl(ctx context.Context, codecID astiav.CodecID, config MultiConfig, settings codecSettings, bufferSize int) TranscoderOption {
+	return func(transcoder *Transcoder) error {
+		builder := NewEncoderBuilder(codecID, settings, bufferSize, transcoder.filter)
+		multiEncoder, err := NewMultiUpdateEncoder(ctx, config, builder)
+		if err != nil {
+			return err
+		}
+
+		transcoder.encoder = multiEncoder
+		return nil
+	}
+}

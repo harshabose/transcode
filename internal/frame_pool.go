@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/asticode/go-astiav"
+
 	"github.com/harshabose/tools/buffer/pkg"
 )
 

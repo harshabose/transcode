@@ -16,7 +16,7 @@ import (
 
 type GeneralEncoder struct {
 	buffer          buffer.BufferWithGenerator[astiav.Packet]
-	filter          CanProduceMediaFrame
+	producer        CanProduceMediaFrame
 	codec           *astiav.Codec
 	encoderContext  *astiav.CodecContext
 	codecFlags      *astiav.Dictionary
@@ -30,7 +30,7 @@ type GeneralEncoder struct {
 func CreateGeneralEncoder(ctx context.Context, codecID astiav.CodecID, canProduceMediaFrame CanProduceMediaFrame, options ...EncoderOption) (*GeneralEncoder, error) {
 	ctx2, cancel := context.WithCancel(ctx)
 	encoder := &GeneralEncoder{
-		filter:     canProduceMediaFrame,
+		producer:   canProduceMediaFrame,
 		codecFlags: astiav.NewDictionary(),
 		ctx:        ctx2,
 		cancel:     cancel,
@@ -69,7 +69,7 @@ func CreateGeneralEncoder(ctx context.Context, codecID astiav.CodecID, canProduc
 	}
 
 	if encoder.buffer == nil {
-		encoder.buffer = buffer.CreateChannelBuffer(ctx, 256, internal.CreatePacketPool())
+		encoder.buffer = buffer.CreateChannelBuffer(ctx2, 256, internal.CreatePacketPool())
 	}
 
 	encoder.findParameterSets(encoder.encoderContext.ExtraData())
@@ -109,7 +109,7 @@ loop1:
 				continue
 			}
 			if err := encoder.encoderContext.SendFrame(frame); err != nil {
-				encoder.filter.PutBack(frame)
+				encoder.producer.PutBack(frame)
 				if !errors.Is(err, astiav.ErrEagain) {
 					continue loop1
 				}
@@ -127,7 +127,7 @@ loop1:
 					continue loop2
 				}
 			}
-			encoder.filter.PutBack(frame)
+			encoder.producer.PutBack(frame)
 		}
 	}
 }
@@ -136,7 +136,7 @@ func (encoder *GeneralEncoder) getFrame() (*astiav.Frame, error) {
 	ctx, cancel := context.WithTimeout(encoder.ctx, 50*time.Millisecond)
 	defer cancel()
 
-	return encoder.filter.GetFrame(ctx)
+	return encoder.producer.GetFrame(ctx)
 }
 
 func (encoder *GeneralEncoder) GetPacket(ctx context.Context) (*astiav.Packet, error) {
