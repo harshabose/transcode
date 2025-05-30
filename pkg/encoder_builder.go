@@ -84,3 +84,12 @@ func (b *GeneralEncoderBuilder) Build(ctx context.Context) (Encoder, error) {
 
 	return encoder, nil
 }
+
+func (b *GeneralEncoderBuilder) GetCurrentBitrate() (int64, error) {
+	g, ok := b.settings.(CanGetCurrentBitrate)
+	if !ok {
+		return 0, ErrorInterfaceMismatch
+	}
+
+	return g.GetCurrentBitrate()
+}

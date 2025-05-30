@@ -127,6 +127,11 @@ func NewMultiUpdateEncoder(ctx context.Context, config MultiConfig, builder *Gen
 		return nil, ErrorInterfaceMismatch
 	}
 
+	initialBitrate, err := builder.GetCurrentBitrate()
+	if err != nil {
+		initialBitrate = encoder.bitrates[0]
+	}
+
 	for _, bitrate := range encoder.bitrates {
 		producer := newDummyMediaFrameProducer(buffer.CreateChannelBuffer(ctx2, 90, internal.CreateFramePool()), describer)
 
@@ -142,7 +147,7 @@ func NewMultiUpdateEncoder(ctx context.Context, config MultiConfig, builder *Gen
 		encoder.encoders = append(encoder.encoders, newSplitEncoder(e.(*GeneralEncoder), producer))
 	}
 
-	encoder.switchEncoder(0)
+	encoder.switchEncoder(encoder.findBestEncoderIndex(initialBitrate))
 
 	return encoder, nil
 }
@@ -199,6 +204,7 @@ func (u *MultiUpdateEncoder) findBestEncoderIndex(targetBps int64) int {
 
 func (u *MultiUpdateEncoder) switchEncoder(index int) {
 	if index < len(u.encoders) {
+		fmt.Printf("swapping to %d encoder with bitrate %d\n", index, u.bitrates[index])
 		u.active.Swap(u.encoders[index])
 	}
 }
