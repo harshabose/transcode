@@ -274,8 +274,7 @@ func (u *MultiUpdateEncoder) loop() {
 				}
 			}
 
-			// NOT PUT BACK AS THEY ARE BEING REF IN THE INDIVIDUAL BUFFERS
-			// u.producer.PutBack(frame)
+			u.producer.PutBack(frame)
 		}
 	}
 }
@@ -300,11 +299,8 @@ func (u *MultiUpdateEncoder) pushFrame(encoder *splitEncoder, frame *astiav.Fram
 		return fmt.Errorf("failed to generate frame from encoder pool")
 	}
 
-	// NOTE: THIS IS NEEDED AS Ref NEEDS A NEWLY ALLOCATED OR Unref FRAME
-	refFrame.Unref()
-
 	if err := refFrame.Ref(frame); err != nil {
-		return fmt.Errorf("erorr while adding ref to frame; err: %s", err.Error())
+		return fmt.Errorf("erorr while adding ref to frame; err: %s", "refFrame is nil")
 	}
 
 	// PUT IN BUFFER
